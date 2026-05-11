@@ -157,7 +157,7 @@ function App() {
                 pokemon={target}
                 chain={chain}
                 onBack={reset}
-                onPick={(p) => { setTarget(p); setTransitionDone(false); }}
+                onPick={(p) => { setTarget(p); setTransitionDone(true); }}
                 locale={locale}
               />
           }

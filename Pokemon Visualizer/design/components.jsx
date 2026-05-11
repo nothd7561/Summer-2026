@@ -38,6 +38,10 @@ const CHROME_T = {
     footer: '© ビジュアライザー 2.0 · ポケデックス 調査 · 1,302 種',
     screens: ['選択', '抽出', 'ファイル'],
   },
+  ZH: {
+    footer: '© 可视化工具 2.0 · 宝可梦图鉴调查 · 1,302 条目',
+    screens: ['选择', '提取', '档案'],
+  },
 };
 
 function Chrome({ screen, locale = 'EN', onLocaleChange }) {
@@ -48,7 +52,7 @@ function Chrome({ screen, locale = 'EN', onLocaleChange }) {
         <div className="chrome-top">
           <div className="brand">poké<span className="dot">.</span><span className="sup">°</span></div>
           <div className="locale">
-            {['EN','JP'].map(l => (
+            {['EN','JP','ZH'].map(l => (
               <button key={l} className={'pill' + (locale === l ? ' on' : '')}
                 onClick={() => onLocaleChange && onLocaleChange(l)}
                 style={{ all:'unset', cursor:'pointer', width:28, height:28, borderRadius:999,

@@ -27,12 +27,24 @@ const STAT_T = {
     ability: '特性', hiddenAbility: '夢特性', bstTotal: '合計種族値',
     morphDesc: '外見・サイズ・形態分類', envDesc: '生息地と繁殖', gen: '世代',
   },
+  ZH: {
+    menu: '// 菜单', back: '← 返回', random: '↻ 随机', dossier: '档案',
+    nav: ['概览', '统计', '形态', '环境', '技能'],
+    stage: (n, t) => `阶段 ${n}/${t} · 点击切换`,
+    noChain: '无进化链',
+    legendary: '传说', mythical: '幻之',
+    height: '身高', weight: '体重', bst: '种族值合计', xp: '基础经验',
+    shape: '形状', color: '颜色', habitat: '栖息地', growth: '成长速度',
+    capture: '捕获率', happiness: '亲密度', eggGroups: '蛋组',
+    ability: '特性', hiddenAbility: '梦特性', bstTotal: '种族值合计',
+    morphDesc: '外形、体型与视觉分类', envDesc: '栖息地与繁殖', gen: '世代',
+  },
 };
 
 // rings sized dynamically per sprite — see dynBASE_R / dynRING_GAP in Stats
 
 function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
-  const [tab, setTab] = useStateS('statistics');
+  const [tab, setTab] = useStateS('overview');
   const [hoveredRing, setHoveredRing] = useStateS(null);
   const t = STAT_T[locale] || STAT_T.EN;
   const mainline = window.PokeData.mainlineChain(chain);
@@ -42,7 +54,7 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
   // dynamic ring sizing — measure the actual rendered sprite container
   const spriteRef = useRefS(null);
   const popupRef = useRefS(null);
-  const leaveTimer = useRefS(null);
+  const [shiny, setShiny] = useStateS(false);
   const [spriteR, setSpriteR] = useStateS(Math.min(320, window.innerWidth * 0.32) / 2);
 
   useEffectS(() => {
@@ -52,8 +64,13 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
     return () => obs.disconnect();
   }, []);
 
-  const dynBASE_R = spriteR + 22;
+  // Reset shiny when pokemon changes
+  useEffectS(() => { setShiny(false); }, [pokemon.number]);
+
+  const dynBASE_R = spriteR + 55;
   const dynRING_GAP = 24;
+
+  const shinySprite = pokemon.sprite?.replace('/pokemon/', '/pokemon/shiny/');
 
   function handleRingMouseMove(e) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -86,19 +103,27 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
       }}>
         <div style={{
           position:'absolute', top:'clamp(70px, 9vh, 100px)', left:'clamp(24px, 3.5vw, 70px)',
-          display:'flex', gap:6,
+          display:'flex', flexDirection:'column', gap:10,
         }}>
-          <button className="btn ghost" onClick={onBack}
-            style={{ padding:'7px 14px', fontSize:10, letterSpacing:'0.16em' }}>
-            {t.back}
-          </button>
-          <button className="btn" onClick={() => {
-            const pool = window.__pokeAll || [];
-            const r = pool[Math.floor(Math.random() * pool.length)];
-            if (r && onPick) onPick(r);
-          }} style={{ padding:'7px 14px', fontSize:10, letterSpacing:'0.16em' }}>
-            {t.random}
-          </button>
+          <div style={{ display:'flex', gap:6 }}>
+            <button className="btn ghost" onClick={onBack}
+              style={{ padding:'7px 14px', fontSize:10, letterSpacing:'0.16em' }}>
+              {t.back}
+            </button>
+            <button className="btn" onClick={() => {
+              const pool = window.__pokeAll || [];
+              const r = pool[Math.floor(Math.random() * pool.length)];
+              if (r && onPick) onPick(r);
+            }} style={{ padding:'7px 14px', fontSize:10, letterSpacing:'0.16em' }}>
+              {t.random}
+            </button>
+          </div>
+          <div style={{
+            fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.16em',
+            textTransform:'uppercase', color:'var(--ink-mute)', paddingLeft:2,
+          }}>
+            Hover over lines for evolution stages
+          </div>
         </div>
         <div className="sidenav">
           {NAV.map(item => (
@@ -125,7 +150,7 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
           cursor: hovP && hovP.number !== pokemon.number ? 'pointer' : 'default',
         }}
           onMouseMove={handleRingMouseMove}
-          onMouseLeave={() => { leaveTimer.current = setTimeout(() => setHoveredRing(null), 150); }}
+          onMouseLeave={() => setHoveredRing(null)}
           onClick={() => { if (hovP && hovP.number !== pokemon.number) onPick && onPick(hovP); }}>
 
           <EvolutionRings rings={Math.max(1, mainline.length)} active={pokemon} chain={mainline}
@@ -135,7 +160,7 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
             onClick={(e) => { e.stopPropagation(); e.currentTarget.classList.remove('bounce'); void e.currentTarget.offsetWidth; e.currentTarget.classList.add('bounce'); }}
             style={{ position:'relative', zIndex:3, width:'min(320px, 32vw)', aspectRatio:'1/1', cursor:'pointer' }}>
             <style>{`@keyframes spriteBounce{0%,100%{transform:translateY(0) scale(1);}30%{transform:translateY(-18px) scale(1.05);}60%{transform:translateY(7px) scale(0.98);}} .bounce img{animation:spriteBounce 700ms cubic-bezier(.2,.7,.2,1);}`}</style>
-            <img src={pokemon.sprite} alt={pokemon.name} style={{
+<img src={shiny ? shinySprite : pokemon.sprite} alt={pokemon.name} style={{
               width:'100%', height:'100%', objectFit:'contain', imageRendering:'pixelated',
               filter:'drop-shadow(0 24px 28px rgba(0,0,0,0.22))',
             }}/>
@@ -146,12 +171,10 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
             entering popup cancels it, so the card stays alive for clicking */}
         {hovP && (
           <div ref={popupRef}
-            onMouseEnter={() => clearTimeout(leaveTimer.current)}
-            onMouseLeave={() => setHoveredRing(null)}
             onClick={() => { if (hovP.number !== pokemon.number) onPick && onPick(hovP); }}
             style={{
-              position:'absolute', bottom:'clamp(50px, 6vh, 75px)', left:'50%',
-              transform:'translateX(-50%)', zIndex:10, pointerEvents:'auto',
+              position:'fixed', bottom:40, left:'clamp(24px, 3.5vw, 70px)',
+              zIndex:10, pointerEvents:'auto',
               cursor: hovP.number !== pokemon.number ? 'pointer' : 'default',
               background:'var(--card)', border:'1px solid var(--line)',
               borderRadius:16, padding:'10px 14px',
@@ -197,8 +220,22 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
           }}>
             {pokemon.name}
           </h1>
-          <div style={{ fontFamily:'var(--mono)', fontSize:11, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--ink-mute)', marginTop:10 }}>
-            {t.gen} {pokemon.generation.replace('gen-','').toUpperCase()}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
+            <div style={{ fontFamily:'var(--mono)', fontSize:11, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
+              {t.gen} {pokemon.generation.replace('gen-','').toUpperCase()}
+            </div>
+            <button onClick={() => setShiny(s => !s)} style={{
+              all:'unset', cursor:'pointer',
+              fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
+              display:'inline-flex', alignItems:'center', gap:5,
+              padding:'4px 10px', borderRadius:999,
+              border:`1px solid ${shiny ? '#c79a2a' : 'rgba(17,17,17,0.25)'}`,
+              color: shiny ? '#c79a2a' : 'var(--ink-mute)',
+              background: shiny ? 'rgba(199,154,42,0.1)' : 'transparent',
+              transition:'all 200ms ease',
+            }}>
+              ✦ shiny
+            </button>
           </div>
         </div>
 
@@ -212,10 +249,36 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
         <div className="dot-rule"/>
 
         <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0 }}>
-          <div style={{ marginBottom:16, flexShrink:0 }}>
+          <div style={{ marginBottom:16, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <span style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:16, letterSpacing:'0.18em', textTransform:'uppercase' }}>
               → {NAV.find(n=>n.id===tab)?.label}
             </span>
+            <div style={{ display:'flex', gap:14 }}>
+              {NAV.findIndex(n => n.id === tab) > 0 && (
+                <button onClick={() => setTab(NAV[NAV.findIndex(n => n.id === tab) - 1].id)} style={{
+                  all:'unset', cursor:'pointer',
+                  fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
+                  color:'var(--ink-mute)', borderBottom:'1px dashed var(--ink-mute)', paddingBottom:1,
+                  transition:'color 160ms, border-color 160ms',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color='var(--ink)'; e.currentTarget.style.borderColor='var(--ink)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color='var(--ink-mute)'; e.currentTarget.style.borderColor='var(--ink-mute)'; }}>
+                  ← back
+                </button>
+              )}
+              {NAV.findIndex(n => n.id === tab) < NAV.length - 1 && (
+                <button onClick={() => setTab(NAV[NAV.findIndex(n => n.id === tab) + 1].id)} style={{
+                  all:'unset', cursor:'pointer',
+                  fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
+                  color:'var(--ink-mute)', borderBottom:'1px dashed var(--ink-mute)', paddingBottom:1,
+                  transition:'color 160ms, border-color 160ms',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color='var(--ink)'; e.currentTarget.style.borderColor='var(--ink)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color='var(--ink-mute)'; e.currentTarget.style.borderColor='var(--ink-mute)'; }}>
+                  next →
+                </button>
+              )}
+            </div>
           </div>
           <div style={{ flex:1, overflowY:'auto', paddingRight:6 }} className="no-scrollbar">
             <div style={{ display: tab === 'overview'     ? undefined : 'none' }}><Overview p={pokemon} t={t}/></div>
@@ -231,10 +294,14 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
 }
 
 /* ——— tabs ——— */
+function toSentenceCase(str) {
+  return str.toLowerCase().replace(/(^|[.!?]\s+)([a-z])/g, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
 function Overview({ p, t }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-      <p style={{ margin:0, fontSize:13, lineHeight:1.75 }}>{p.flavor || '—'}</p>
+      <p style={{ margin:0, fontSize:13, lineHeight:1.75 }}>{p.flavor ? toSentenceCase(p.flavor) : '—'}</p>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
         <Cell label={t.height} value={p.height + ' m'}/>
         <Cell label={t.weight} value={p.weight + ' kg'}/>
@@ -364,6 +431,7 @@ function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
       <style>{`
         @keyframes rrA{from{transform:rotate(0)}to{transform:rotate(360deg)}}
         @keyframes rrB{from{transform:rotate(360deg)}to{transform:rotate(0)}}
+        @keyframes ringBreath{0%,100%{opacity:0.55}50%{opacity:1}}
       `}</style>
       {Array.from({ length: rings }).map((_, i) => {
         const r = baseR + i * ringGap;
@@ -375,7 +443,7 @@ function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
         return (
           <div key={i} style={{
             position:'absolute', width: r*2, height: r*2, borderRadius:'50%',
-            animation:`${dir} ${dur}s linear infinite`,
+            animation:`${dir} ${dur}s linear infinite${i === 0 ? ', ringBreath 4.5s ease-in-out infinite' : ''}`,
           }}>
             <svg viewBox={`0 0 ${r*2} ${r*2}`} style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
               <circle cx={r} cy={r} r={r-1}
@@ -395,7 +463,8 @@ function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
             </svg>
             {p && (
               <div style={{
-                position:'absolute', top:'50%', right:-4,
+                position:'absolute', top:'50%',
+                right: isHovered || isActive ? -4.5 : -2,
                 transform:'translateY(-50%)',
                 width: isHovered || isActive ? 11 : 6,
                 height: isHovered || isActive ? 11 : 6,

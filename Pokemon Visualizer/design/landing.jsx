@@ -26,6 +26,18 @@ const LANDING_T = {
     confirm: '確認',
     surprise: '↻ サプライズ',
   },
+  ZH: {
+    eyebrow: 'Summer 2026',
+    headline1: '了解',
+    headline2: '你的',
+    headlineItalic: '宝可梦。',
+    desc: 'A project that combines data extraction and graphic design.',
+    viewing: '当前查看',
+    searchLabel: '搜索图鉴',
+    placeholder: '名称或图鉴编号',
+    confirm: '确认',
+    surprise: '↻ 随机',
+  },
 };
 
 function Landing({ data, onConfirm, locale = 'EN' }) {
