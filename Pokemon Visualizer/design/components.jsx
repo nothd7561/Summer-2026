@@ -44,13 +44,22 @@ const CHROME_T = {
   },
 };
 
-function Chrome({ screen, locale = 'EN', onLocaleChange }) {
+function Chrome({ screen, locale = 'EN', onLocaleChange, showBlurb = false }) {
   const t = CHROME_T[locale] || CHROME_T.EN;
   return (
     <div className="chrome">
       <div className="chrome-inner">
         <div className="chrome-top">
-          <div className="brand">poké<span className="dot">.</span><span className="sup">°</span></div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div className="brand">poké<span className="dot">.</span><span className="sup">°</span></div>
+            {showBlurb && (
+              <div style={{
+                fontFamily:'var(--mono)', fontSize:8, letterSpacing:'0.13em',
+                textTransform:'uppercase', color:'var(--ink-mute)', lineHeight:1.4,
+                transition:'opacity 400ms ease',
+              }}>double click<br/>pokeball · return</div>
+            )}
+          </div>
           <div className="locale">
             {['EN','JP','ZH'].map(l => (
               <button key={l} className={'pill' + (locale === l ? ' on' : '')}

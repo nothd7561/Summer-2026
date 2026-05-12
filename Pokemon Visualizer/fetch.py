@@ -36,3 +36,10 @@ df["is_mythical"] = df["is_mythical"].map({"TRUE": True, "FALSE": False})
 
 df.to_csv(r'C:\Users\lucas\Downloads\Code\Side Projects\poke-api display\pokemon_revised.csv')
 
+
+need_sprite = []
+for index, row in df.iterrows():
+    if pd.isna(row['sprite_url']):
+        need_sprite.append(row["name"])
+
+print (need_sprite)

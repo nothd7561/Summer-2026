@@ -43,11 +43,86 @@ const STAT_T = {
 
 // rings sized dynamically per sprite — see dynBASE_R / dynRING_GAP in Stats
 
-function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
+function MegaStoneIcon({ size = 44 }) {
+  const C = ['transparent','#1a3a2a','#7ae8dc','#ffffff','#3ecfb2','#a070ff'];
+  const px = [
+    [0,0,0,1,1,1,1,0,0,0],
+    [0,0,1,2,2,2,2,1,0,0],
+    [0,1,2,3,3,2,2,2,1,0],
+    [1,2,3,2,4,4,4,2,2,1],
+    [1,2,3,4,4,4,4,4,2,1],
+    [1,2,4,4,4,4,4,4,2,1],
+    [1,2,4,4,5,5,4,4,2,1],
+    [0,1,2,4,5,4,4,2,1,0],
+    [0,0,1,2,4,2,2,1,0,0],
+    [0,0,0,1,1,1,1,0,0,0],
+  ];
+  const n = px[0].length;
+  return (
+    <div style={{
+      display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+      filter:`drop-shadow(0 0 ${size*0.28}px rgba(122,232,220,0.95)) drop-shadow(0 0 ${size*0.55}px rgba(160,112,255,0.55))`,
+    }}>
+      <svg width={size} height={size} viewBox={`0 0 ${n} ${n}`}
+        style={{ imageRendering:'pixelated', display:'block' }}>
+        {px.flatMap((row, r) =>
+          row.map((c, col) =>
+            c ? <rect key={`${r}-${col}`} x={col} y={r} width={1} height={1} fill={C[c]}/> : null
+          ).filter(Boolean)
+        )}
+      </svg>
+    </div>
+  );
+}
+
+// MegaRing renders only the visual rings — the clickable stone is a fixed portal rendered by Stats
+function MegaRing({ r }) {
+  return (
+    <div style={{
+      position:'absolute', inset:0,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      pointerEvents:'none', zIndex:2,
+    }}>
+      <style>{`
+        @keyframes mPing { 0%{transform:scale(1);opacity:0.75} 100%{transform:scale(1.26);opacity:0} }
+        @keyframes mHue  { 0%{filter:hue-rotate(0deg)} 100%{filter:hue-rotate(360deg)} }
+      `}</style>
+      {/* Outward ping rings */}
+      {[0,1,2].map(i => (
+        <div key={i} style={{
+          position:'absolute', width:r*2, height:r*2, borderRadius:'50%',
+          border:`1.5px solid ${['#a8edea','#d4b3ff','#90ee90'][i]}`,
+          animation:`mPing 2.6s ${i*0.87}s ease-out infinite`,
+          opacity:0, pointerEvents:'none',
+        }}/>
+      ))}
+      {/* Rainbow rotating ring */}
+      <div style={{
+        position:'absolute', width:r*2, height:r*2, borderRadius:'50%',
+        animation:'mHue 5s linear infinite, rrA 22s linear infinite',
+        pointerEvents:'none',
+      }}>
+        <svg viewBox={`0 0 ${r*2} ${r*2}`} style={{position:'absolute',inset:0,width:'100%',height:'100%'}}>
+          <defs>
+            <linearGradient id="mgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stopColor="#d4b3ff"/>
+              <stop offset="33%"  stopColor="#a8edea"/>
+              <stop offset="66%"  stopColor="#90ee90"/>
+              <stop offset="100%" stopColor="#d4b3ff"/>
+            </linearGradient>
+          </defs>
+          <circle cx={r} cy={r} r={r-1.5} fill="none" stroke="url(#mgGrad)" strokeWidth="2" opacity="0.8"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN' }) {
   const [tab, setTab] = useStateS('overview');
   const [hoveredRing, setHoveredRing] = useStateS(null);
   const t = STAT_T[locale] || STAT_T.EN;
-  const mainline = window.PokeData.mainlineChain(chain);
+  const mainline = window.PokeData.mainlineChain(chain, pokemon);
   const NAV = t.nav.map((label, i) => ({ id: ['overview','statistics','morphology','environment','abilities'][i], label }));
   const hovP = hoveredRing !== null ? mainline[hoveredRing] : null;
 
@@ -55,6 +130,8 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
   const spriteRef = useRefS(null);
   const popupRef = useRefS(null);
   const [shiny, setShiny] = useStateS(false);
+  const [activeForm, setActiveForm] = useStateS(null);
+  const [morphPhase, setMorphPhase] = useStateS(null);
   const [spriteR, setSpriteR] = useStateS(Math.min(320, window.innerWidth * 0.32) / 2);
 
   useEffectS(() => {
@@ -64,13 +141,89 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
     return () => obs.disconnect();
   }, []);
 
-  // Reset shiny when pokemon changes
-  useEffectS(() => { setShiny(false); }, [pokemon.number]);
+  // Reset shiny + active form when pokemon changes
+  useEffectS(() => { setShiny(false); setActiveForm(null); setMorphPhase(null); }, [pokemon.number]);
 
   const dynBASE_R = spriteR + 55;
   const dynRING_GAP = 24;
 
-  const shinySprite = pokemon.sprite?.replace('/pokemon/', '/pokemon/shiny/');
+  // Mega evolution
+  const isFinalEvo = !mainline.length || pokemon.number === mainline[mainline.length - 1].number;
+  const megaForms = isFinalEvo
+    ? (window.__pokeAllFull || []).filter(p => p.isForm && p.chainId === pokemon.chainId && p.name.toLowerCase().includes('mega'))
+    : [];
+  const hasMega = megaForms.length > 0;
+
+  // Alt forms — same-root name variants (excludes mega, gmax, totem, cap, cosplay, starter)
+  const SKIP_FORM = ['mega','gmax','totem','cap','cosplay','starter','partner'];
+  const formRoot = pokemon.name.split('-')[0].toLowerCase();
+  const altForms = (window.__pokeAllFull || []).filter(p =>
+    p.isForm &&
+    p.chainId === pokemon.chainId &&
+    !SKIP_FORM.some(s => p.name.toLowerCase().includes(s)) &&
+    p.name.toLowerCase().startsWith(formRoot + '-') &&
+    p.name.toLowerCase() !== pokemon.name.toLowerCase()
+  );
+
+  const displayPokemon = activeForm || pokemon;
+  const displaySprite = shiny
+    ? displayPokemon.sprite?.replace('/pokemon/', '/pokemon/shiny/')
+    : displayPokemon.sprite;
+
+  function switchForm(form) {
+    if (morphPhase) return;
+    setMorphPhase('out');
+    setTimeout(() => {
+      setActiveForm(prev => prev?.number === form.number ? null : form);
+      setMorphPhase('in');
+      setTimeout(() => setMorphPhase(null), 550);
+    }, 350);
+  }
+
+  // Mega ring: always a full ringGap + 20px past the last evo ring, capped to stay on screen
+  const lastEvoRingR = dynBASE_R + Math.max(0, mainline.length - 1) * dynRING_GAP;
+  const dynMegaR = Math.min(
+    Math.max(lastEvoRingR + dynRING_GAP + 20, dynBASE_R + Math.max(1, mainline.length) * dynRING_GAP + 20),
+    Math.min(window.innerWidth, window.innerHeight) * 0.44
+  );
+  const [megaAnimPhase, setMegaAnimPhase] = useStateS(null);
+  const [megaStonePos, setMegaStonePos] = useStateS(null);
+  // Fixed-position coords for the portal stone button (escapes overflow:hidden clipping)
+  const [megaStoneFixed, setMegaStoneFixed] = useStateS(null);
+
+  useEffectS(() => {
+    if (!hasMega || !spriteRef.current) { setMegaStoneFixed(null); return; }
+    const update = () => {
+      const rect = spriteRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMegaStoneFixed({ x: rect.left + rect.width / 2 + dynMegaR, y: rect.top + rect.height / 2 });
+    };
+    update();
+    window.addEventListener('resize', update);
+    const root = document.getElementById('root');
+    root?.addEventListener('scroll', update, { passive: true });
+    return () => {
+      window.removeEventListener('resize', update);
+      root?.removeEventListener('scroll', update);
+    };
+  }, [hasMega, spriteR, pokemon.number]);
+
+  function triggerMega(form) {
+    const rect = spriteRef.current?.getBoundingClientRect();
+    const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+    setMegaStonePos({ cx, cy });
+    // fly → land on sprite (700ms) → sit there for 1.5s → white flash → scroll
+    setMegaAnimPhase('fly');
+    setTimeout(() => {
+      setMegaAnimPhase('landed');
+      setTimeout(() => {
+        setMegaAnimPhase('flash');
+        onMega(form);                           // scroll under the white screen
+        setTimeout(() => setMegaAnimPhase(null), 1200);
+      }, 1500);
+    }, 700);
+  }
 
   function handleRingMouseMove(e) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -95,16 +248,35 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
       overflow: 'hidden',
     }}>
 
-      {/* LEFT NAV — buttons at top under brand, nav centered */}
+      {/* BACKGROUND DECORATION */}
       <div style={{
-        position:'relative',
-        display:'flex', flexDirection:'column', justifyContent:'center',
-        padding:'0 0 0 clamp(24px, 3.5vw, 70px)',
+        position:'absolute', inset:0, zIndex:0, overflow:'hidden', pointerEvents:'none',
       }}>
+        {/* Faded giant Pokémon name watermark */}
         <div style={{
-          position:'absolute', top:'clamp(70px, 9vh, 100px)', left:'clamp(24px, 3.5vw, 70px)',
-          display:'flex', flexDirection:'column', gap:10,
+          position:'absolute', left:'50%', bottom:'-0.12em',
+          transform:'translateX(-50%)',
+          fontFamily:'var(--display)', fontWeight:900,
+          fontSize:'min(22vw, 220px)', letterSpacing:'-0.05em',
+          textTransform:'uppercase', color:'var(--ink)',
+          opacity:0.04, userSelect:'none', lineHeight:1, whiteSpace:'nowrap',
         }}>
+          {pokemon.name}
+        </div>
+        {/* Subtle vertical spine between left nav and center */}
+        <div style={{
+          position:'absolute', top:'10%', bottom:'10%',
+          left:'minmax(160px,200px)', width:1,
+          background:'var(--ink)', opacity:0.06,
+        }}/>
+      </div>
+
+      {/* LEFT NAV — buttons then sidenav, both flowing from top */}
+      <div style={{
+        display:'flex', flexDirection:'column', gap:28,
+        padding:'clamp(70px, 9vh, 100px) 0 clamp(50px, 6vh, 75px) clamp(24px, 3.5vw, 70px)',
+      }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ display:'flex', gap:6 }}>
             <button className="btn ghost" onClick={onBack}
               style={{ padding:'7px 14px', fontSize:10, letterSpacing:'0.16em' }}>
@@ -122,7 +294,7 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
             fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.16em',
             textTransform:'uppercase', color:'var(--ink-mute)', paddingLeft:2,
           }}>
-            Hover over lines for evolution stages
+            Hover rings for evolution stages
           </div>
         </div>
         <div className="sidenav">
@@ -156,14 +328,38 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
           <EvolutionRings rings={Math.max(1, mainline.length)} active={pokemon} chain={mainline}
             hoveredRing={hoveredRing} baseR={dynBASE_R} ringGap={dynRING_GAP}/>
 
+          {hasMega && <MegaRing r={dynMegaR}/>}
+
           <div ref={spriteRef}
             onClick={(e) => { e.stopPropagation(); e.currentTarget.classList.remove('bounce'); void e.currentTarget.offsetWidth; e.currentTarget.classList.add('bounce'); }}
             style={{ position:'relative', zIndex:3, width:'min(320px, 32vw)', aspectRatio:'1/1', cursor:'pointer' }}>
-            <style>{`@keyframes spriteBounce{0%,100%{transform:translateY(0) scale(1);}30%{transform:translateY(-18px) scale(1.05);}60%{transform:translateY(7px) scale(0.98);}} .bounce img{animation:spriteBounce 700ms cubic-bezier(.2,.7,.2,1);}`}</style>
-<img src={shiny ? shinySprite : pokemon.sprite} alt={pokemon.name} style={{
+            <style>{`
+              @keyframes spriteBounce{0%,100%{transform:translateY(0) scale(1);}30%{transform:translateY(-18px) scale(1.05);}60%{transform:translateY(7px) scale(0.98);}}
+              .bounce img{animation:spriteBounce 700ms cubic-bezier(.2,.7,.2,1);}
+              @keyframes formOut{0%{opacity:1;transform:scale(1);filter:blur(0px) brightness(1);}100%{opacity:0;transform:scale(1.08);filter:blur(7px) brightness(2.4);}}
+              @keyframes formIn{0%{opacity:0;transform:scale(0.88);filter:blur(10px) brightness(2.2);}100%{opacity:1;transform:scale(1);filter:blur(0px) brightness(1);}}
+              @keyframes formWave{0%{transform:scale(0.35);opacity:0.85;}100%{transform:scale(2.4);opacity:0;}}
+            `}</style>
+            <img src={displaySprite} alt={displayPokemon.name} style={{
               width:'100%', height:'100%', objectFit:'contain', imageRendering:'pixelated',
               filter:'drop-shadow(0 24px 28px rgba(0,0,0,0.22))',
+              animation: morphPhase === 'out' ? 'formOut 350ms ease-out forwards'
+                       : morphPhase === 'in'  ? 'formIn 550ms ease-out forwards'
+                       : undefined,
             }}/>
+            {/* Wave rings during morph */}
+            {morphPhase && [0,1,2].map(i => (
+              <div key={i} style={{
+                position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+                pointerEvents:'none',
+              }}>
+                <div style={{
+                  width:'100%', height:'100%', borderRadius:'50%',
+                  border:`2px solid ${['rgba(168,237,234,0.9)','rgba(200,160,255,0.75)','rgba(144,238,144,0.7)'][i]}`,
+                  animation:`formWave 0.62s ${i * 0.13}s ease-out forwards`,
+                }}/>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -220,7 +416,7 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
           }}>
             {pokemon.name}
           </h1>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, flexWrap:'wrap' }}>
             <div style={{ fontFamily:'var(--mono)', fontSize:11, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
               {t.gen} {pokemon.generation.replace('gen-','').toUpperCase()}
             </div>
@@ -236,6 +432,24 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
             }}>
               ✦ shiny
             </button>
+            {altForms.map(form => {
+              const label = form.name.slice(formRoot.length + 1).replace(/-/g, ' ');
+              const isActive = activeForm?.number === form.number;
+              return (
+                <button key={form.number} onClick={() => switchForm(form)} style={{
+                  all:'unset', cursor:'pointer',
+                  fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
+                  display:'inline-flex', alignItems:'center', gap:5,
+                  padding:'4px 10px', borderRadius:999,
+                  border:`1px solid ${isActive ? 'var(--hot)' : 'rgba(17,17,17,0.25)'}`,
+                  color: isActive ? 'var(--hot)' : 'var(--ink-mute)',
+                  background: isActive ? 'rgba(217,74,61,0.08)' : 'transparent',
+                  transition:'all 200ms ease',
+                }}>
+                  ◈ {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -289,6 +503,80 @@ function Stats({ pokemon, chain, onBack, onPick, locale = 'EN' }) {
           </div>
         </div>
       </div>
+
+      {/* Portal: mega stone button at fixed position — never clipped by overflow:hidden */}
+      {hasMega && megaStoneFixed && megaAnimPhase === null && ReactDOM.createPortal(
+        <div
+          onClick={() => triggerMega(megaForms[0])}
+          title="Mega Evolve"
+          style={{
+            position:'fixed', left: megaStoneFixed.x, top: megaStoneFixed.y,
+            transform:'translate(-50%,-50%)',
+            zIndex:30, cursor:'pointer', pointerEvents:'auto',
+          }}
+        >
+          <style>{`@keyframes mStonePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}`}</style>
+          <div style={{ animation:'mStonePulse 2s ease-in-out infinite' }}>
+            <MegaStoneIcon size={38}/>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Mega animation overlays (all portaled to body to escape clipping) ── */}
+
+      {/* Phase 1 — fly: stone travels from ring edge to sprite center, stays visible */}
+      {megaAnimPhase === 'fly' && megaStonePos && ReactDOM.createPortal(
+        <div style={{ position:'fixed', left: megaStonePos.cx + dynMegaR, top: megaStonePos.cy, zIndex:270, pointerEvents:'none' }}>
+          <style>{`@keyframes mStoneFly{
+            0%   { transform:translate(-50%,-50%) scale(1);   opacity:1; }
+            65%  { transform:translate(calc(-50% - ${dynMegaR}px),-50%) scale(1.6); opacity:1; }
+            100% { transform:translate(calc(-50% - ${dynMegaR}px),-50%) scale(1.15); opacity:1; }
+          }`}</style>
+          <div style={{ animation:'mStoneFly 700ms cubic-bezier(.2,.8,.3,1) forwards' }}>
+            <MegaStoneIcon size={58}/>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Phase 2 — landed: stone sits on sprite for 1.5s with building glow */}
+      {megaAnimPhase === 'landed' && megaStonePos && ReactDOM.createPortal(
+        <div style={{ position:'fixed', left: megaStonePos.cx, top: megaStonePos.cy, transform:'translate(-50%,-50%)', zIndex:270, pointerEvents:'none' }}>
+          <style>{`
+            @keyframes mLandPulse { 0%{transform:scale(1.1)} 100%{transform:scale(1.42)} }
+            @keyframes mLandGlow  { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.5)} 100%{opacity:1;transform:translate(-50%,-50%) scale(1)} }
+          `}</style>
+          {/* Expanding white radial glow that builds to cover the whole screen */}
+          <div style={{
+            position:'fixed', left: megaStonePos.cx, top: megaStonePos.cy,
+            width: Math.max(window.innerWidth, window.innerHeight) * 2.8,
+            height: Math.max(window.innerWidth, window.innerHeight) * 2.8,
+            borderRadius:'50%',
+            background:'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(230,240,255,0.7) 25%, rgba(200,220,255,0.3) 55%, transparent 75%)',
+            animation:'mLandGlow 1.5s ease-out forwards',
+            pointerEvents:'none', zIndex:269,
+          }}/>
+          {/* The stone itself — pulses while landed */}
+          <div style={{ position:'relative', zIndex:271, animation:'mLandPulse 0.44s ease-in-out infinite alternate' }}>
+            <MegaStoneIcon size={66}/>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Phase 3 — flash: single div animated so opacity:0 at unmount, no abrupt snap */}
+      {megaAnimPhase === 'flash' && ReactDOM.createPortal(
+        <>
+          <style>{`@keyframes mFlashFade{0%,22%{opacity:1}100%{opacity:0}}`}</style>
+          <div style={{
+            position:'fixed', inset:0, zIndex:280,
+            background:'white', pointerEvents:'none',
+            animation:'mFlashFade 1200ms ease-out forwards',
+          }}/>
+        </>,
+        document.body
+      )}
     </div>
   );
 }
@@ -379,24 +667,45 @@ function Environment({ p, t }) {
 }
 
 function Abilities({ p, t }) {
+  const [descs, setDescs] = useStateS({});
+
+  useEffectS(() => {
+    const all = [...(p.abilities || []), p.hiddenAbility].filter(Boolean);
+    all.forEach(async (name) => {
+      if (descs[name] !== undefined) return;
+      const slug = name.toLowerCase().replace(/[\s_]+/g, '-');
+      try {
+        const res = await fetch(`https://pokeapi.co/api/v2/ability/${slug}/`);
+        if (!res.ok) { setDescs(d => ({ ...d, [name]: '' })); return; }
+        const json = await res.json();
+        const entry = json.flavor_text_entries?.find(e => e.language.name === 'en');
+        setDescs(d => ({ ...d, [name]: entry ? entry.flavor_text.replace(/\s+/g, ' ') : '' }));
+      } catch { setDescs(d => ({ ...d, [name]: '' })); }
+    });
+  }, [p.number]);
+
+  const AbilityBlock = ({ name, dashed }) => (
+    <div style={{ borderTop: dashed ? '1px dashed var(--hot)' : '1px solid var(--line)', paddingTop: 12 }}>
+      <div className="mono-meta" style={dashed ? { color:'var(--hot)' } : {}}>
+        {dashed ? t.hiddenAbility : t.ability}
+      </div>
+      <div style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:18, letterSpacing:'-0.01em', marginTop:4, lineHeight:1.1 }}>
+        {window.PokeData.titleCase(name)}
+      </div>
+      {descs[name] ? (
+        <p style={{ margin:'6px 0 0', fontSize:11, lineHeight:1.65, color:'var(--ink-mute)', wordBreak:'break-word' }}>
+          {descs[name]}
+        </p>
+      ) : descs[name] === undefined ? (
+        <p style={{ margin:'6px 0 0', fontSize:10, color:'var(--ink-mute)', opacity:0.5, fontFamily:'var(--mono)', letterSpacing:'0.1em' }}>loading…</p>
+      ) : null}
+    </div>
+  );
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-      {p.abilities.map(a => (
-        <div key={a} style={{ borderTop:'1px solid var(--line)', paddingTop: 12 }}>
-          <div className="mono-meta">{t.ability}</div>
-          <div style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:20, letterSpacing:'-0.01em', marginTop: 4 }}>
-            {window.PokeData.titleCase(a)}
-          </div>
-        </div>
-      ))}
-      {p.hiddenAbility && (
-        <div style={{ borderTop:'1px dashed var(--hot)', paddingTop: 12 }}>
-          <div className="mono-meta" style={{color:'var(--hot)'}}>{t.hiddenAbility}</div>
-          <div style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:20, letterSpacing:'-0.01em', marginTop: 4 }}>
-            {window.PokeData.titleCase(p.hiddenAbility)}
-          </div>
-        </div>
-      )}
+      {p.abilities.map(a => <AbilityBlock key={a} name={a} dashed={false}/>)}
+      {p.hiddenAbility && <AbilityBlock name={p.hiddenAbility} dashed={true}/>}
     </div>
   );
 }
@@ -424,6 +733,31 @@ function Swatch({ color }) {
 }
 
 function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
+  const prevNumRef   = useRefS(null);
+  const [tracingIdx, setTracingIdx] = useStateS(null);
+  const traceCircRef = useRefS(null);
+
+  // Detect switch TO outermost ring → trigger trace animation
+  useEffectS(() => {
+    const outerIdx = rings - 1;
+    const activeIdx = chain.findIndex(p => p && p.number === active.number);
+    if (activeIdx === outerIdx && prevNumRef.current !== null && prevNumRef.current !== active.number) {
+      setTracingIdx(outerIdx);
+      const t = setTimeout(() => setTracingIdx(null), 1500);
+      prevNumRef.current = active.number;
+      return () => clearTimeout(t);
+    }
+    prevNumRef.current = active.number;
+  }, [active.number, rings]);
+
+  // Kick off the stroke-dashoffset draw on next frame
+  useEffectS(() => {
+    if (tracingIdx === null || !traceCircRef.current) return;
+    requestAnimationFrame(() => {
+      if (traceCircRef.current) traceCircRef.current.style.strokeDashoffset = '0';
+    });
+  }, [tracingIdx]);
+
   return (
     <div style={{ position:'absolute', inset:0,
       display:'flex', alignItems:'center', justifyContent:'center',
@@ -432,6 +766,7 @@ function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
         @keyframes rrA{from{transform:rotate(0)}to{transform:rotate(360deg)}}
         @keyframes rrB{from{transform:rotate(360deg)}to{transform:rotate(0)}}
         @keyframes ringBreath{0%,100%{opacity:0.55}50%{opacity:1}}
+        @keyframes traceHue{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
       `}</style>
       {Array.from({ length: rings }).map((_, i) => {
         const r = baseR + i * ringGap;
@@ -440,12 +775,23 @@ function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
         const p = chain[i];
         const isActive = p && p.number === active.number;
         const isHovered = hoveredRing === i;
+        const isTracing = tracingIdx === i;
+        const circumference = 2 * Math.PI * (r - 1);
         return (
           <div key={i} style={{
             position:'absolute', width: r*2, height: r*2, borderRadius:'50%',
-            animation:`${dir} ${dur}s linear infinite${i === 0 ? ', ringBreath 4.5s ease-in-out infinite' : ''}`,
+            animation:`${dir} ${dur}s linear infinite${i === 0 ? ', ringBreath 4.5s ease-in-out infinite' : ''}${isTracing ? ', traceHue 1.4s linear' : ''}`,
           }}>
             <svg viewBox={`0 0 ${r*2} ${r*2}`} style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
+              {isTracing && (
+                <defs>
+                  <linearGradient id="traceGrad" gradientUnits="userSpaceOnUse" x1={r*2} y1={r} x2={0} y2={r}>
+                    <stop offset="0%"   stopColor="#d4b3ff"/>
+                    <stop offset="50%"  stopColor="#a8edea"/>
+                    <stop offset="100%" stopColor="#90ee90"/>
+                  </linearGradient>
+                </defs>
+              )}
               <circle cx={r} cy={r} r={r-1}
                 fill="none"
                 stroke="var(--ink)"
@@ -458,6 +804,18 @@ function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
                   fill="none" stroke="var(--hot)"
                   strokeWidth={2.5} opacity={0.55}
                   style={{ transition:'opacity 160ms' }}
+                />
+              )}
+              {isTracing && (
+                <circle
+                  ref={traceCircRef}
+                  cx={r} cy={r} r={r-1}
+                  fill="none" stroke="url(#traceGrad)"
+                  strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference}
+                  transform={`rotate(-90 ${r} ${r})`}
+                  style={{ transition:'stroke-dashoffset 1.3s cubic-bezier(.35,0,.2,1)' }}
                 />
               )}
             </svg>

@@ -29,6 +29,14 @@ body {
 }
 #root { overflow-y: auto; scroll-behavior: smooth; }
 
+/* Subtle vignette — always on, pure minimalistic depth */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at 50% 46%, transparent 38%, rgba(0,0,0,0.045) 100%);
+}
+
 /* Bubbles — translucent, glassy */
 .bg-stage { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .bubble {
@@ -240,3 +248,9 @@ body {
   transition: width 900ms cubic-bezier(.2,.7,.2,1);
 }
 .statbar.hot > div { background: linear-gradient(90deg, var(--hot), #e87b71); }
+
+@keyframes sprite-pop {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.75); }
+  60%  { opacity: 1; transform: translate(-50%,-50%) scale(1.06); }
+  100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+}

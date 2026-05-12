@@ -4,6 +4,7 @@ const { useEffect: useEffectT, useState: useStateT, useRef: useRefT } = React;
 function Transition({ pokemon, onDone }) {
   const [started, setStarted] = useStateT(false);
   const [tick, setTick] = useStateT(0);
+  const [fading, setFading] = useStateT(false);
   const containerRef = useRefT(null);
 
   // Start only when scrolled into view
@@ -28,7 +29,7 @@ function Transition({ pokemon, onDone }) {
       const p = Math.min(1, (t - start) / total);
       setTick(p);
       if (p < 1) raf = requestAnimationFrame(step);
-      else setTimeout(onDone, 380);
+      else { setFading(true); setTimeout(onDone, 500); }
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
@@ -42,6 +43,8 @@ function Transition({ pokemon, onDone }) {
       position:'relative', width:'100%', height:'100vh',
       display:'flex', alignItems:'center', justifyContent:'center',
       zIndex: 5,
+      opacity: fading ? 0 : 1,
+      transition: 'opacity 500ms ease',
     }}>
       <style>{`
         @keyframes tRing {

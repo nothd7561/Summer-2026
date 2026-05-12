@@ -5,7 +5,7 @@ const TWEAK_DEFAULTS = {
   "palette": "paper",
   "accent": "ember",
   "showChrome": true,
-  "showBubbles": true
+  "showBubbles": false
 };
 
 const PALETTES = {
@@ -25,26 +25,22 @@ function App() {
   const [data, setData] = useStateApp(null);
   const [target, setTarget] = useStateApp(null);
   const [transitionDone, setTransitionDone] = useStateApp(false);
-  const [locale, setLocale] = useStateApp('EN');
-  const [scrolled, setScrolled] = useStateApp(false);
+  const [locale, setLocale]           = useStateApp('EN');
+  const [landingPhase, setLandingPhase] = useStateApp('idle');
+  const [pokeballLifted, setPokeballLifted] = useStateApp(false);
+  const [megaTarget, setMegaTarget] = useStateApp(null);
   const [tweaks, setTweak] = window.useTweaks
     ? window.useTweaks(TWEAK_DEFAULTS)
     : [TWEAK_DEFAULTS, () => {}];
 
-  const statsRef = useRefApp(null);
-
-  // Track scroll for pokeball return-to-top button
-  useEffectApp(() => {
-    const root = document.getElementById('root');
-    if (!root) return;
-    const onScroll = () => setScrolled(root.scrollTop > 80);
-    root.addEventListener('scroll', onScroll, { passive: true });
-    return () => root.removeEventListener('scroll', onScroll);
-  }, []);
+  const statsRef     = useRefApp(null);
+  const megaRef      = useRefApp(null);
+  const landingCmdRef = useRefApp(null);
 
   useEffectApp(() => {
     window.PokeData.loadPokemon().then(d => {
       window.__pokeAll = d.all.filter(p => !p.isForm);
+      window.__pokeAllFull = d.all;
       setData(d);
     });
   }, []);
@@ -65,6 +61,15 @@ function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [data]);
 
+  // auto-lift/lower pokeball based on scroll position when a pokemon is selected
+  useEffectApp(() => {
+    const root = document.getElementById('root');
+    if (!root || !target) return;
+    const update = () => setPokeballLifted(root.scrollTop > window.innerHeight * 0.3);
+    root.addEventListener('scroll', update, { passive: true });
+    return () => root.removeEventListener('scroll', update);
+  }, [target]);
+
   // apply palette + accent to CSS vars
   useEffectApp(() => {
     const p = PALETTES[tweaks.palette] || PALETTES.paper;
@@ -75,9 +80,30 @@ function App() {
     document.documentElement.style.setProperty('--hot', ACCENTS[tweaks.accent] || ACCENTS.ember);
   }, [tweaks.palette, tweaks.accent]);
 
+  function activateMega(megaForm) {
+    setMegaTarget(megaForm);
+    requestAnimationFrame(() => {
+      const root = document.getElementById('root');
+      if (root && megaRef.current) root.scrollTop = megaRef.current.offsetTop;
+    });
+  }
+
+  function backFromMega() {
+    const root = document.getElementById('root');
+    if (root && statsRef.current) root.scrollTo({ top: statsRef.current.offsetTop, behavior: 'smooth' });
+    setTimeout(() => setMegaTarget(null), 600);
+  }
+
   function confirmPick(p) {
     setTarget(p);
+    setMegaTarget(null);
     setTransitionDone(false);
+    setPokeballLifted(true);
+    // Instant-jump to stats while flash covers the screen
+    requestAnimationFrame(() => {
+      const root = document.getElementById('root');
+      if (root && statsRef.current) root.scrollTop = statsRef.current.offsetTop;
+    });
   }
 
   function scrollToStats() {
@@ -89,7 +115,20 @@ function App() {
   function reset() {
     const root = document.getElementById('root');
     if (root) root.scrollTo({ top: 0, behavior: 'smooth' });
+    setPokeballLifted(false);
+    setMegaTarget(null);
+    landingCmdRef.current?.goIdle();
     setTimeout(() => { setTarget(null); setTransitionDone(false); }, 650);
+  }
+  function backToSearch() {
+    const root = document.getElementById('root');
+    if (root) root.scrollTo({ top: 0, behavior: 'smooth' });
+    setPokeballLifted(false);
+    setMegaTarget(null);
+    setTimeout(() => {
+      landingCmdRef.current?.goSearch();
+      setTimeout(() => { setTarget(null); setTransitionDone(false); }, 400);
+    }, 500);
   }
 
   if (!data) {
@@ -107,19 +146,20 @@ function App() {
   return (
     <div style={{ position:'relative', width:'100%', minHeight:'100%' }}>
       {tweaks.showBubbles && <BgBubbles count={14} seed={screenNum + 7}/>}
-      {tweaks.showChrome && <Chrome screen={screenNum} locale={locale} onLocaleChange={setLocale}/>}
+      {tweaks.showChrome && <Chrome screen={screenNum} locale={locale} onLocaleChange={setLocale} showBlurb={landingPhase === 'searching' && !megaTarget}/>}
 
-      {/* Pokeball scroll-to-top — appears when scrolled past landing */}
-      <div style={{
-        position:'fixed', top: 22, left:'50%', transform:'translateX(-50%)',
+      {/* Pokeball — hidden in pokecenter (no target), visible once a pokemon is selected */}
+      {target && <div style={{
+        position:'fixed',
+        top: pokeballLifted ? '22px' : (landingPhase === 'searching' ? 'clamp(108px,13vh,138px)' : 'clamp(82px,11vh,115px)'),
+        left:'50%', transform:'translateX(-50%)',
         zIndex: 60,
-        opacity: scrolled ? 1 : 0,
-        pointerEvents: scrolled ? 'auto' : 'none',
-        transition: 'opacity 320ms ease',
+        transition: 'top 400ms cubic-bezier(.2,.7,.2,1)',
       }}>
         <button
-          onClick={() => document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })}
-          title="Back to top"
+          onClick={() => { if (pokeballLifted) { backToSearch(); } else { document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }); } }}
+          onDoubleClick={reset}
+          title="Click to scroll up · Double-click to return to Pokémon Centre"
           style={{
             all:'unset', cursor:'pointer',
             width: 40, height: 40, borderRadius:'50%',
@@ -140,11 +180,11 @@ function App() {
             <circle cx="12" cy="12" r="2.8" fill="white" stroke="var(--ink)" strokeWidth="1.5"/>
           </svg>
         </button>
-      </div>
+      </div>}
 
       {/* Landing section — always full viewport */}
       <div style={{ position:'relative', width:'100%', height:'100vh' }}>
-        <Landing data={data} onConfirm={confirmPick} locale={locale}/>
+        <Landing data={data} onConfirm={confirmPick} locale={locale} landingCmdRef={landingCmdRef} onPhaseChange={setLandingPhase}/>
         {target && <ScrollHint onClick={scrollToStats}/>}
       </div>
 
@@ -153,14 +193,29 @@ function App() {
         <div ref={statsRef} style={{ position:'relative', width:'100%', height:'100vh' }}>
           {!transitionDone
             ? <Transition pokemon={target} onDone={() => setTransitionDone(true)}/>
-            : <Stats
-                pokemon={target}
-                chain={chain}
-                onBack={reset}
-                onPick={(p) => { setTarget(p); setTransitionDone(true); }}
-                locale={locale}
-              />
+            : <div style={{ position:'relative', width:'100%', height:'100%', animation:'statsFadeIn 600ms ease forwards' }}>
+                <style>{`@keyframes statsFadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+                <Stats
+                  pokemon={target}
+                  chain={chain}
+                  onBack={backToSearch}
+                  onPick={(p) => { setTarget(p); setMegaTarget(null); setTransitionDone(true); }}
+                  onMega={activateMega}
+                  locale={locale}
+                />
+              </div>
           }
+        </div>
+      )}
+
+      {/* Mega section — below stats, appears after mega evolution triggered */}
+      {target && megaTarget && (
+        <div ref={megaRef} style={{ position:'relative', width:'100%', height:'100vh' }}>
+          <window.MegaView
+            megaPokemon={megaTarget}
+            basePokemon={target}
+            onBack={backFromMega}
+          />
         </div>
       )}
 
