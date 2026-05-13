@@ -238,6 +238,8 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
   const [evoMethods, setEvoMethods] = useStateE({});
   const [evoOrder, setEvoOrder] = useStateE({});
   const [gmaxScrolled, setGmaxScrolled] = useStateE(false);
+  const [radarTarget, setRadarTarget] = useStateE(pokemon);
+  const [radarFading, setRadarFading] = useStateE(false);
   const gmaxRef = useRefE(null);
 
   // Sorted by API chain order (pre-order DFS), not dex number — fixes baby Pokémon like Pichu
@@ -302,8 +304,17 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
     return () => root.removeEventListener('scroll', check);
   }, [gmaxForm, gmaxScrolled]);
 
+  // Keep radar synced when active pokemon changes
+  useEffectE(() => { setRadarTarget(pokemon); }, [pokemon.number]);
+
   const noEvo = evoFamily.length <= 1;
   const gmaxMoveName = gmaxForm ? (GMAX_MOVES[gmaxForm.name.toLowerCase()] || 'G-Max Move') : null;
+
+  function selectRadarTarget(p) {
+    if (p.number === radarTarget.number) return;
+    setRadarFading(true);
+    setTimeout(() => { setRadarTarget(p); setRadarFading(false); }, 200);
+  }
 
   function scrollToGmax() {
     const root = document.getElementById('root');
@@ -335,6 +346,8 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
           0%, 100% { transform: translateY(0); }
           50%       { transform: translateY(7px); }
         }
+        .evo-chain-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .evo-chain-scroll::-webkit-scrollbar { display: none; }
       `}</style>
 
       {/* ─── SECTION 1: Evolution Chain ─── */}
@@ -348,46 +361,6 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
           position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
           background: 'radial-gradient(ellipse 65% 55% at 50% 50%, rgba(168,200,255,0.13), transparent 70%)',
         }}/>
-
-        {/* Stat polygon radar — right-side panel */}
-        <div style={{
-          position: 'absolute', right: 'clamp(20px, 3.5vw, 56px)', top: '50vh',
-          transform: 'translateY(-50%)',
-          zIndex: 3, pointerEvents: 'none',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-          animation: 'evoUp 800ms 500ms ease-out both',
-        }}>
-          <div style={{
-            fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.26em',
-            textTransform: 'uppercase', color: 'var(--ink-mute)',
-          }}>
-            Base Stats
-          </div>
-          <StatPolygon family={evoFamily} activePokemon={pokemon} size={220}/>
-          {evoFamily.length > 1 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {evoFamily.map(p => {
-                const isActive = p.number === pokemon.number;
-                return (
-                  <div key={p.number} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <div style={{
-                      width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                      background: isActive ? 'var(--hot)' : 'var(--ink)',
-                      opacity: isActive ? 1 : 0.28,
-                    }}/>
-                    <div style={{
-                      fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.08em',
-                      color: isActive ? 'var(--ink)' : 'var(--ink-mute)',
-                      opacity: isActive ? 0.85 : 0.5,
-                    }}>
-                      {p.name}<span style={{ marginLeft: 5, opacity: 0.6 }}>{p.bst}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
         {/* Back button */}
         <div style={{
@@ -425,137 +398,194 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
           </div>
         </div>
 
-        {/* Does not evolve */}
-        {noEvo ? (
+        {/* Content row: radar (LEFT) + chain (CENTER) + spacer (RIGHT for balance) */}
+        <div style={{
+          zIndex: 2, display: 'flex', alignItems: 'center',
+          width: '100%', animation: 'evoUp 700ms 350ms ease-out both',
+        }}>
+          {/* Radar panel — LEFT, explicit width so right spacer can match */}
           <div style={{
-            zIndex: 2, textAlign: 'center',
-            animation: 'evoUp 700ms 350ms ease-out both',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
-          }}>
-            <img src={pokemon.sprite} alt={pokemon.name} style={{
-              width: 'min(220px, 26vw)', height: 'min(220px, 26vw)',
-              objectFit: 'contain', imageRendering: 'pixelated',
-              filter: 'drop-shadow(0 10px 28px rgba(0,0,0,0.2))',
-            }}/>
-            <div style={{
-              fontFamily: 'var(--haas)', fontSize: 10, letterSpacing: '0.22em',
-              textTransform: 'uppercase', color: 'var(--ink-mute)',
-            }}>
-              This Pokémon does not evolve.
-            </div>
-          </div>
-        ) : (
-          /* Chain — horizontally scrollable for long families (Eevee etc.) */
-          <div style={{
-            zIndex: 2, width: '100%', overflowX: 'auto', overflowY: 'visible',
-            display: 'flex', justifyContent: 'center',
-            animation: 'evoUp 700ms 350ms ease-out both',
-            padding: '96px clamp(32px,5vw,80px) 20px',
+            flexShrink: 0,
+            width: 'clamp(270px, 22vw, 310px)',
             boxSizing: 'border-box',
+            paddingLeft: 'clamp(108px, 10vw, 125px)',
+            paddingRight: '6px',
+            marginTop: '-clamp(20px, 2.5vh, 32px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-              {evoFamily.map((p, i) => {
-                const isActive = p.number === pokemon.number;
-                const method = i > 0 ? evoMethods[p.name.toLowerCase()] : null;
-                return (
-                  <React.Fragment key={p.number}>
+            <div style={{
+              fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.26em',
+              textTransform: 'uppercase', color: 'var(--ink-mute)',
+            }}>Base Stats</div>
 
-                    {/* Arrow + requirement card */}
-                    {i > 0 && (
-                      <div style={{
-                        position: 'relative', display: 'flex', alignItems: 'center',
-                        padding: '0 16px', flexShrink: 0,
-                      }}>
-                        {/* Card floats above the arrow */}
-                        <div style={{
-                          position: 'absolute', bottom: 'calc(100% + 18px)', left: '50%',
-                          transform: 'translateX(-50%)',
-                          background: 'var(--paper)',
-                          border: '1px solid rgba(17,17,17,0.14)',
-                          borderRadius: 14, padding: '12px 18px',
-                          display: 'flex', flexDirection: 'column', gap: 6,
-                          alignItems: 'center', textAlign: 'center',
-                          boxShadow: '0 6px 22px rgba(0,0,0,0.11)',
-                          minWidth: 140, maxWidth: 210,
-                          zIndex: 5,
-                          whiteSpace: 'normal',
-                        }}>
-                          <div style={{
-                            fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.22em',
-                            textTransform: 'uppercase', color: 'var(--ink-mute)',
-                          }}>
-                            How to Evolve
-                          </div>
-                          <div style={{
-                            fontFamily: 'var(--haas)', fontWeight: 800,
-                            fontSize: 'clamp(14px, 1.4vw, 19px)',
-                            letterSpacing: '-0.02em', lineHeight: 1.1,
-                            color: 'var(--ink)',
-                          }}>
-                            {method?.title || '…'}
-                          </div>
-                          {method?.sub && (
-                            <div style={{
-                              fontFamily: 'var(--haas)', fontSize: 9, letterSpacing: '0.08em',
-                              color: 'var(--ink-mute)', lineHeight: 1.55,
-                              textAlign: 'center',
-                            }}>
-                              {method.sub}
-                            </div>
-                          )}
-                        </div>
-                        {/* Arrow */}
-                        <svg width="96" height="28" viewBox="0 0 96 28" style={{ display: 'block' }}>
-                          <line x1="0" y1="14" x2="74" y2="14" stroke="var(--ink)" strokeWidth="2.5" opacity="0.32"/>
-                          <polygon points="74,7 96,14 74,21" fill="var(--ink)" opacity="0.32"/>
-                        </svg>
-                      </div>
-                    )}
-
-                    {/* Pokémon stage */}
-                    <div
-                      onClick={() => !isActive && onPick?.(p)}
-                      style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-                        opacity: isActive ? 1 : 0.48,
-                        transform: isActive ? 'scale(1.1)' : 'scale(0.88)',
-                        transition: 'all 220ms ease',
-                        cursor: isActive ? 'default' : 'pointer',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <img src={p.sprite} alt={p.name} style={{
-                        width: 'min(190px, 16vw)', height: 'min(190px, 16vw)',
-                        objectFit: 'contain', imageRendering: 'pixelated',
-                        filter: isActive
-                          ? 'drop-shadow(0 6px 18px rgba(217,74,61,0.5))'
-                          : 'drop-shadow(0 4px 10px rgba(0,0,0,0.12))',
-                        transition: 'filter 220ms ease',
-                      }}/>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                        <div style={{
-                          fontFamily: 'var(--haas)', fontWeight: 700,
-                          fontSize: 'clamp(12px, 1.2vw, 16px)',
-                          letterSpacing: '-0.01em',
-                          color: isActive ? 'var(--hot)' : 'var(--ink)',
-                        }}>
-                          {p.name}
-                        </div>
-                        <div style={{ display: 'flex', gap: 5 }}>
-                          <span className={'type-chip t-' + p.type1.toLowerCase()}
-                            style={{ fontSize: 9, padding: '3px 9px' }}>{p.type1}</span>
-                          {p.type2 && <span className={'type-chip t-' + p.type2.toLowerCase()}
-                            style={{ fontSize: 9, padding: '3px 9px' }}>{p.type2}</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                  </React.Fragment>
-                );
-              })}
+            {/* Animated radar */}
+            <div style={{
+              opacity: radarFading ? 0 : 1,
+              transform: radarFading ? 'scale(0.9)' : 'scale(1)',
+              transition: 'opacity 200ms ease, transform 200ms ease',
+            }}>
+              <StatPolygon family={evoFamily} activePokemon={radarTarget} size={155}/>
             </div>
+
+            {/* Name selector pills */}
+            {evoFamily.length > 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'stretch' }}>
+                {evoFamily.map(p => {
+                  const isSel = p.number === radarTarget.number;
+                  return (
+                    <button key={p.number} onClick={() => selectRadarTarget(p)} style={{
+                      all: 'unset', cursor: isSel ? 'default' : 'pointer',
+                      fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      padding: '4px 10px', borderRadius: 999,
+                      border: `1px solid ${isSel ? 'rgba(217,74,61,0.5)' : 'rgba(17,17,17,0.15)'}`,
+                      color: isSel ? 'var(--hot)' : 'var(--ink-mute)',
+                      background: isSel ? 'rgba(217,74,61,0.08)' : 'transparent',
+                      fontWeight: isSel ? 700 : 400,
+                      transition: 'all 160ms',
+                    }}>{p.name}</button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Chain / no-evo — centered in remaining space */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {noEvo ? (
+              <div style={{
+                textAlign: 'center',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
+                padding: 'clamp(24px,4vh,48px) clamp(32px,5vw,80px)',
+              }}>
+                <img src={pokemon.sprite} alt={pokemon.name} style={{
+                  width: 'min(220px, 26vw)', height: 'min(220px, 26vw)',
+                  objectFit: 'contain', imageRendering: 'pixelated',
+                  filter: 'drop-shadow(0 10px 28px rgba(0,0,0,0.2))',
+                }}/>
+                <div style={{
+                  fontFamily: 'var(--haas)', fontSize: 10, letterSpacing: '0.22em',
+                  textTransform: 'uppercase', color: 'var(--ink-mute)',
+                }}>
+                  This Pokémon does not evolve.
+                </div>
+              </div>
+            ) : (
+              /* Chain — hidden scrollbar for long families (Eevee etc.) */
+              <div className="evo-chain-scroll" style={{
+                overflowX: 'auto', overflowY: 'visible',
+                display: 'flex', justifyContent: 'center',
+                padding: '96px clamp(20px,3vw,48px) 20px',
+                boxSizing: 'border-box',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                  {evoFamily.map((p, i) => {
+                    const isActive = p.number === pokemon.number;
+                    const method = i > 0 ? evoMethods[p.name.toLowerCase()] : null;
+                    return (
+                      <React.Fragment key={p.number}>
+
+                        {/* Arrow + requirement card */}
+                        {i > 0 && (
+                          <div style={{
+                            position: 'relative', display: 'flex', alignItems: 'center',
+                            padding: '0 10px', flexShrink: 0,
+                          }}>
+                            {/* Card floats above the arrow */}
+                            <div style={{
+                              position: 'absolute', bottom: 'calc(100% + 18px)', left: '50%',
+                              transform: 'translateX(-50%)',
+                              background: 'var(--paper)',
+                              border: '1px solid rgba(17,17,17,0.14)',
+                              borderRadius: 14, padding: '12px 18px',
+                              display: 'flex', flexDirection: 'column', gap: 6,
+                              alignItems: 'center', textAlign: 'center',
+                              boxShadow: '0 6px 22px rgba(0,0,0,0.11)',
+                              minWidth: 140, maxWidth: 210,
+                              zIndex: 5,
+                              whiteSpace: 'normal',
+                            }}>
+                              <div style={{
+                                fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.22em',
+                                textTransform: 'uppercase', color: 'var(--ink-mute)',
+                              }}>
+                                How to Evolve
+                              </div>
+                              <div style={{
+                                fontFamily: 'var(--haas)', fontWeight: 800,
+                                fontSize: 'clamp(14px, 1.4vw, 19px)',
+                                letterSpacing: '-0.02em', lineHeight: 1.1,
+                                color: 'var(--ink)',
+                              }}>
+                                {method?.title || '…'}
+                              </div>
+                              {method?.sub && (
+                                <div style={{
+                                  fontFamily: 'var(--haas)', fontSize: 9, letterSpacing: '0.08em',
+                                  color: 'var(--ink-mute)', lineHeight: 1.55,
+                                  textAlign: 'center',
+                                }}>
+                                  {method.sub}
+                                </div>
+                              )}
+                            </div>
+                            {/* Arrow */}
+                            <svg width="72" height="24" viewBox="0 0 72 24" style={{ display: 'block' }}>
+                              <line x1="0" y1="12" x2="54" y2="12" stroke="var(--ink)" strokeWidth="2" opacity="0.32"/>
+                              <polygon points="54,6 72,12 54,18" fill="var(--ink)" opacity="0.32"/>
+                            </svg>
+                          </div>
+                        )}
+
+                        {/* Pokémon stage */}
+                        <div
+                          onClick={() => !isActive && onPick?.(p)}
+                          style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+                            opacity: isActive ? 1 : 0.48,
+                            transform: isActive ? 'scale(1.1)' : 'scale(0.88)',
+                            transition: 'all 220ms ease',
+                            cursor: isActive ? 'default' : 'pointer',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <img src={p.sprite} alt={p.name} style={{
+                            width: 'min(155px, 12vw)', height: 'min(155px, 12vw)',
+                            objectFit: 'contain', imageRendering: 'pixelated',
+                            filter: isActive
+                              ? 'drop-shadow(0 6px 18px rgba(217,74,61,0.5))'
+                              : 'drop-shadow(0 4px 10px rgba(0,0,0,0.12))',
+                            transition: 'filter 220ms ease',
+                          }}/>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{
+                              fontFamily: 'var(--haas)', fontWeight: 700,
+                              fontSize: 'clamp(12px, 1.2vw, 16px)',
+                              letterSpacing: '-0.01em',
+                              color: isActive ? 'var(--hot)' : 'var(--ink)',
+                            }}>
+                              {p.name}
+                            </div>
+                            <div style={{ display: 'flex', gap: 5 }}>
+                              <span className={'type-chip t-' + p.type1.toLowerCase()}
+                                style={{ fontSize: 9, padding: '3px 9px' }}>{p.type1}</span>
+                              {p.type2 && <span className={'type-chip t-' + p.type2.toLowerCase()}
+                                style={{ fontSize: 9, padding: '3px 9px' }}>{p.type2}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right spacer — mirrors radar panel width so chain is visually centred */}
+          <div style={{ flexShrink: 0, width: 'clamp(270px, 22vw, 310px)' }}/>
+        </div>
 
       </div>
 
@@ -795,4 +825,5 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
   );
 }
 
+window.StatPolygon = StatPolygon;
 window.EvoView = EvoView;

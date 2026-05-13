@@ -31,6 +31,8 @@ function App() {
   const [megaTarget, setMegaTarget] = useStateApp(null);
   const [evoShown, setEvoShown] = useStateApp(false);
   const [pokeballHovered, setPokeballHovered] = useStateApp(false);
+  const [introGone, setIntroGone] = useStateApp(false);
+
   const [tweaks, setTweak] = window.useTweaks
     ? window.useTweaks(TWEAK_DEFAULTS)
     : [TWEAK_DEFAULTS, () => {}];
@@ -39,6 +41,11 @@ function App() {
   const megaRef      = useRefApp(null);
   const evoRef       = useRefApp(null);
   const landingCmdRef = useRefApp(null);
+
+  useEffectApp(() => {
+    const t = setTimeout(() => setIntroGone(true), 1700);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffectApp(() => {
     window.PokeData.loadPokemon().then(d => {
@@ -165,6 +172,16 @@ function App() {
 
   return (
     <div style={{ position:'relative', width:'100%', minHeight:'100%' }}>
+      {/* Game-building entry: black screen fades out on first load */}
+      {!introGone && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: '#000', pointerEvents: 'none',
+          animation: 'introFade 1700ms ease-out forwards',
+        }}>
+          <style>{`@keyframes introFade { 0%,55%{opacity:1} 100%{opacity:0} }`}</style>
+        </div>
+      )}
       {tweaks.showBubbles && <BgBubbles count={14} seed={screenNum + 7}/>}
       {tweaks.showChrome && <Chrome screen={screenNum} locale={locale} onLocaleChange={setLocale}
         showBlurb={landingPhase === 'searching' && !megaTarget && !target}

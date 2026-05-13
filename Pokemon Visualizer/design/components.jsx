@@ -185,4 +185,119 @@ function ScrollHint({ onClick }) {
   );
 }
 
-Object.assign(window, { BgBubbles, Chrome, Sparkle, Sprite, ScrollHint });
+function FlowShield({ size = 180 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = size * DPR;
+    canvas.height = size * DPR;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(DPR, DPR);
+    const cx = size / 2, cy = size / 2;
+    const R = size * 0.38;
+    const particles = Array.from({ length: 56 }, (_, i) => ({
+      angle: (i / 56) * Math.PI * 2,
+      r: R,
+      speed: (0.005 + Math.random() * 0.008) * (Math.random() > 0.45 ? 1 : -1),
+      phase: Math.random() * Math.PI * 2,
+      trail: [],
+    }));
+    let t = 0, raf;
+    function draw() {
+      ctx.clearRect(0, 0, size, size);
+      t += 0.014;
+      for (const p of particles) {
+        p.angle += p.speed * (1 + 0.35 * Math.sin(t * 1.6 + p.phase));
+        p.r = R + Math.sin(p.angle * 3 + t * 2.4 + p.phase) * 9;
+        const x = cx + p.r * Math.cos(p.angle);
+        const y = cy + p.r * Math.sin(p.angle);
+        p.trail.push({ x, y });
+        if (p.trail.length > 12) p.trail.shift();
+        if (p.trail.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(p.trail[0].x, p.trail[0].y);
+          for (let i = 1; i < p.trail.length; i++) ctx.lineTo(p.trail[i].x, p.trail[i].y);
+          ctx.strokeStyle = 'rgba(217,74,61,0.5)';
+          ctx.lineWidth = 0.85;
+          ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(217,74,61,0.2)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,140,120,0.9)'; ctx.fill();
+      }
+      raf = requestAnimationFrame(draw);
+    }
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, [size]);
+  return (
+    <canvas ref={canvasRef} style={{
+      position: 'absolute', left: '50%', top: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: size, height: size,
+      pointerEvents: 'none', zIndex: 0,
+    }}/>
+  );
+}
+
+function CloudBg({ r = 217, g = 74, b = 61 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let w = 0, h = 0, blobs = [], raf;
+    function init() {
+      w = canvas.offsetWidth || 800;
+      h = canvas.offsetHeight || 400;
+      canvas.width = Math.round(w);
+      canvas.height = Math.round(h);
+      blobs = Array.from({ length: 9 }, () => ({
+        x: Math.random() * w,
+        y: h * 0.15 + Math.random() * h * 0.7,
+        radius: 110 + Math.random() * 160,
+        dx: (0.18 + Math.random() * 0.22) * (Math.random() > 0.5 ? 1 : -1),
+        speed: 0.25 + Math.random() * 0.35,
+        phase: Math.random() * Math.PI * 2,
+        alpha: 0.22 + Math.random() * 0.28,
+      }));
+    }
+    init();
+    const ctx = canvas.getContext('2d');
+    let t = 0;
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      t += 0.004;
+      for (const bl of blobs) {
+        bl.x += bl.dx;
+        if (bl.dx > 0 && bl.x - bl.radius > w) bl.x = -bl.radius;
+        if (bl.dx < 0 && bl.x + bl.radius < 0) bl.x = w + bl.radius;
+        const y = bl.y + Math.sin(t * bl.speed + bl.phase) * 22;
+        const grd = ctx.createRadialGradient(bl.x, y, 0, bl.x, y, bl.radius);
+        grd.addColorStop(0,   `rgba(${r},${g},${b},${bl.alpha})`);
+        grd.addColorStop(0.55,`rgba(${r},${g},${b},${bl.alpha * 0.4})`);
+        grd.addColorStop(1,   `rgba(${r},${g},${b},0)`);
+        ctx.beginPath();
+        ctx.arc(bl.x, y, bl.radius, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(draw);
+    }
+    draw();
+    const onResize = () => init();
+    window.addEventListener('resize', onResize);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); };
+  }, [r, g, b]);
+  return (
+    <canvas ref={canvasRef} style={{
+      position: 'absolute', inset: 0, width: '100%', height: '100%',
+      pointerEvents: 'none', zIndex: 0,
+      filter: 'blur(55px) saturate(1.3)',
+    }}/>
+  );
+}
+
+Object.assign(window, { BgBubbles, Chrome, Sparkle, Sprite, ScrollHint, FlowShield, CloudBg });

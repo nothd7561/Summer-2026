@@ -45,6 +45,8 @@ function MegaView({ megaForms, basePokemon, onBack }) {
   const [shiny, setShiny]         = useStateM(false);
   const [morphing, setMorphing]   = useStateM(false);
   const [evoMethods, setEvoMethods] = useStateM({});
+  const [radarTarget, setRadarTarget] = useStateM(basePokemon);
+  const [radarFading, setRadarFading] = useStateM(false);
 
   const megaPokemon = megaForms[activeIdx];
   const hasGif = !!megaPokemon?.gifSprite;
@@ -82,6 +84,8 @@ function MegaView({ megaForms, basePokemon, onBack }) {
       .catch(() => {});
   }, [basePokemon.chainId]);
 
+  useEffectM(() => { setRadarTarget(basePokemon); }, [basePokemon.number]);
+
   // Re-run reveal animation whenever the active pokemon changes
   useEffectM(() => {
     setRevealed(false);
@@ -89,6 +93,12 @@ function MegaView({ megaForms, basePokemon, onBack }) {
     const t = setTimeout(() => setRevealed(true), 400);
     return () => clearTimeout(t);
   }, [megaPokemon?.number, megaPokemon?.name]);
+
+  function selectRadarTarget(p) {
+    if (p.number === radarTarget.number) return;
+    setRadarFading(true);
+    setTimeout(() => { setRadarTarget(p); setRadarFading(false); }, 200);
+  }
 
   function switchVariant(idx) {
     if (idx === activeIdx || morphing) return;
@@ -188,7 +198,7 @@ function MegaView({ megaForms, basePokemon, onBack }) {
         }}/>
       ))}
 
-      {/* Top-left: revert button + blurb */}
+      {/* Top-left: revert button */}
       <div style={{
         position: 'absolute', top: 'clamp(78px,9vh,106px)', left: 'clamp(24px,3.5vw,70px)',
         zIndex: 4, display: 'flex', flexDirection: 'column', gap: 7,
@@ -198,6 +208,48 @@ function MegaView({ megaForms, basePokemon, onBack }) {
           style={{ padding: '7px 16px', fontSize: 10, letterSpacing: '0.18em' }}>
           ← REVERT
         </button>
+      </div>
+
+      {/* Left-side stat radar panel */}
+      <div style={{
+        position: 'absolute', left: 'clamp(24px,3.5vw,56px)', top: '37%',
+        transform: 'translateY(-50%)',
+        zIndex: 4,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        animation: revealed ? 'megaSlideUp 800ms 900ms ease-out both' : 'none',
+      }}>
+        <div style={{
+          fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.26em',
+          textTransform: 'uppercase', color: 'var(--ink-mute)',
+        }}>Base Stats</div>
+        <div style={{
+          opacity: radarFading ? 0 : 1,
+          transform: radarFading ? 'scale(0.9)' : 'scale(1)',
+          transition: 'opacity 200ms ease, transform 200ms ease',
+        }}>
+          <window.StatPolygon
+            family={evoChain.length ? evoChain : [basePokemon]}
+            activePokemon={radarTarget}
+            size={180}
+          />
+        </div>
+        {evoChain.length > 1 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'stretch' }}>
+            {evoChain.map(p => {
+              const isSel = p.number === radarTarget.number;
+              return (
+                <button key={p.number} onClick={() => selectRadarTarget(p)} style={{
+                  all: 'unset', cursor: isSel ? 'default' : 'pointer',
+                  fontFamily: 'var(--haas)', fontSize: 8, padding: '4px 10px', borderRadius: 999,
+                  border: `1px solid ${isSel ? 'rgba(217,74,61,0.5)' : 'rgba(17,17,17,0.15)'}`,
+                  color: isSel ? 'var(--hot)' : 'var(--ink-mute)',
+                  background: isSel ? 'rgba(217,74,61,0.08)' : 'transparent',
+                  fontWeight: isSel ? 700 : 400, transition: 'all 160ms',
+                }}>{p.name}</button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Top-right: MEGA name block */}
