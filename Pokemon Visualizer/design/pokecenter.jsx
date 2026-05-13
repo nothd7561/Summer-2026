@@ -70,8 +70,11 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
       const currentLook    = new THREE.Vector3();
       const resetFromPos   = new THREE.Vector3();
       const resetFromLook  = new THREE.Vector3();
+      const zoomFromPos    = new THREE.Vector3();
+      const zoomFromLook   = new THREE.Vector3();
       let resetT      = 0;
       let resetActive = false;
+      let zoomT       = 0;
       const pokeballPos = new THREE.Vector3();
       const meshTopPos  = new THREE.Vector3();
 
@@ -267,10 +270,12 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
         animId = requestAnimationFrame(animate);
 
         if (zoomActiveRef.current && !zoomDoneFiredRef.current) {
-          camera.position.lerp(ZOOMPOS, 0.036);
-          currentLook.lerp(ZOOMLOOK, 0.036);
+          zoomT = Math.min(zoomT + 0.022, 1);
+          const ez = zoomT * zoomT * (3 - 2 * zoomT); // smoothstep
+          camera.position.lerpVectors(zoomFromPos, ZOOMPOS, ez);
+          currentLook.lerpVectors(zoomFromLook, ZOOMLOOK, ez);
           camera.lookAt(currentLook);
-          if (camera.position.distanceTo(ZOOMPOS) < 0.06) {
+          if (zoomT >= 1) {
             zoomActiveRef.current = false;
             zoomDoneFiredRef.current = true;
             onZoomComplete?.();
@@ -352,6 +357,11 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
         const rect = renderer.domElement.getBoundingClientRect();
         const { bx, by } = pokeballScreenPos();
         if (Math.hypot(e.clientX - rect.left - bx, e.clientY - rect.top - by) < 60) {
+          zoomFromPos.copy(camera.position);
+          zoomFromLook.copy(currentLook);
+          zoomT = 0;
+          resetActive = false;
+          resetT = 0;
           zoomActiveRef.current = true;
           onZoomStart?.();
         }

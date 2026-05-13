@@ -212,7 +212,7 @@ function MegaView({ megaForms, basePokemon, onBack }) {
 
       {/* Left-side stat radar panel */}
       <div style={{
-        position: 'absolute', left: 'clamp(24px,3.5vw,56px)', top: '37%',
+        position: 'absolute', left: 'clamp(24px,3.5vw,56px)', top: '32%',
         transform: 'translateY(-50%)',
         zIndex: 4,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
@@ -230,7 +230,7 @@ function MegaView({ megaForms, basePokemon, onBack }) {
           <window.StatPolygon
             family={evoChain.length ? evoChain : [basePokemon]}
             activePokemon={radarTarget}
-            size={180}
+            size={198}
           />
         </div>
         {evoChain.length > 1 && (

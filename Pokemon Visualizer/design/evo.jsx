@@ -159,6 +159,43 @@ const GMAX_MOVES = {
   'urshifu-rapid-strike-gmax':   'G-Max Rapid Flow',
 };
 
+const GMAX_DESCRIPTIONS = {
+  'venusaur-gmax':              'Traps the target for 4 turns — non-Grass-types lose 1/6 max HP each turn.',
+  'charizard-gmax':             'Sets the field ablaze for 4 turns — non-Fire-types lose 1/6 max HP each turn.',
+  'blastoise-gmax':             'Traps the target for 4 turns — non-Water-types lose 1/6 max HP each turn.',
+  'butterfree-gmax':            'Randomly inflicts paralysis, poison, or sleep on all opponents.',
+  'pikachu-gmax':               'Paralyzes all opponents after dealing damage.',
+  'meowth-gmax':                'Confuses all opponents and generates a huge pile of coins after the battle.',
+  'machamp-gmax':               'Raises the critical-hit ratio of every ally on the field by one stage.',
+  'gengar-gmax':                'Prevents the target from fleeing or switching out for the rest of the battle.',
+  'kingler-gmax':               'Sharply lowers the Speed of all opponents.',
+  'lapras-gmax':                'Sets Aurora Veil for 5 turns, halving damage taken by all allies.',
+  'eevee-gmax':                 'Infatuates all opponents of the opposite gender.',
+  'snorlax-gmax':               '50% chance to restore the consumed Berry of each ally after dealing damage.',
+  'garbodor-gmax':              'Poisons all opponents after dealing damage.',
+  'melmetal-gmax':              'Afflicts all opponents with Torment — they cannot use the same move twice in a row.',
+  'rillaboom-gmax':             'Ignores the target\'s Ability entirely — no held item or protection reduces its power.',
+  'cinderace-gmax':             'Ignores the target\'s Ability entirely — no held item or protection reduces its power.',
+  'inteleon-gmax':              'Ignores the target\'s Ability entirely — no held item or protection reduces its power.',
+  'corviknight-gmax':           'Removes all entry hazards, screens, and weather effects from the field.',
+  'orbeetle-gmax':              'Sets Gravity for 5 turns — all Pokémon are grounded and move accuracy is boosted.',
+  'drednaw-gmax':               'Scatters Stealth Rock on the opponent\'s side of the field.',
+  'coalossal-gmax':             'Traps the target in volcanic rock for 4 turns, dealing 1/6 max HP each turn.',
+  'flapple-gmax':               'Sharply lowers the Evasiveness of all opponents.',
+  'appletun-gmax':              'Cures all status conditions of every ally currently on the field.',
+  'sandaconda-gmax':            'Traps the target in a raging sandstorm for 4–5 turns.',
+  'toxtricity-amped-gmax':      'Paralyzes or poisons all opponents — the effect is chosen at random.',
+  'toxtricity-low-key-gmax':    'Paralyzes or poisons all opponents — the effect is chosen at random.',
+  'centiskorch-gmax':           'Wraps the target in flames for 4–5 turns, dealing 1/8 max HP each turn.',
+  'hatterene-gmax':             'Confuses all opponents after dealing damage.',
+  'grimmsnarl-gmax':            'Makes the target drowsy — it falls asleep at the end of the next turn.',
+  'alcremie-gmax':              'Restores 1/6 max HP for every ally currently on the field.',
+  'copperajah-gmax':            'Scatters sharp steel fragments on the foe\'s side — Steel-type entry hazard.',
+  'duraludon-gmax':             'Reduces the PP of the last move the target used by 2.',
+  'urshifu-single-strike-gmax': 'Always a critical hit. Bypasses Max Guard and Protect — no shield can block it.',
+  'urshifu-rapid-strike-gmax':  'Always a critical hit. Bypasses Max Guard and Protect — no shield can block it.',
+};
+
 function StatPolygon({ family, activePokemon, size = 340 }) {
   const cx = size / 2, cy = size / 2;
   const R = size * 0.36;
@@ -222,8 +259,8 @@ function StatPolygon({ family, activePokemon, size = 340 }) {
           <text key={i}
             x={cx + lr * Math.cos(ang)} y={cy + lr * Math.sin(ang)}
             textAnchor="middle" dominantBaseline="middle"
-            fontFamily="var(--haas)" fontSize="7.5" fontWeight="600"
-            fill="var(--ink)" opacity="0.28" letterSpacing="0.08em"
+            fontFamily="var(--haas)" fontSize="9" fontWeight="800"
+            fill="var(--ink)" opacity="0.5" letterSpacing="0.06em"
           >
             {label}
           </text>
@@ -309,6 +346,7 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
 
   const noEvo = evoFamily.length <= 1;
   const gmaxMoveName = gmaxForm ? (GMAX_MOVES[gmaxForm.name.toLowerCase()] || 'G-Max Move') : null;
+  const gmaxDescription = gmaxForm ? (GMAX_DESCRIPTIONS[gmaxForm.name.toLowerCase()] || null) : null;
 
   function selectRadarTarget(p) {
     if (p.number === radarTarget.number) return;
@@ -410,7 +448,7 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
             boxSizing: 'border-box',
             paddingLeft: 'clamp(108px, 10vw, 125px)',
             paddingRight: '6px',
-            marginTop: '-clamp(20px, 2.5vh, 32px)',
+            marginTop: '-clamp(50px, 6vh, 72px)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
           }}>
             <div style={{
@@ -424,7 +462,7 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
               transform: radarFading ? 'scale(0.9)' : 'scale(1)',
               transition: 'opacity 200ms ease, transform 200ms ease',
             }}>
-              <StatPolygon family={evoFamily} activePokemon={radarTarget} size={155}/>
+              <StatPolygon family={evoFamily} activePokemon={radarTarget} size={170}/>
             </div>
 
             {/* Name selector pills */}
@@ -808,6 +846,18 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
                 {gmaxMoveName}
               </div>
             </div>
+            {gmaxDescription && (
+              <div style={{
+                marginBottom: 16,
+                fontFamily: 'var(--haas)', fontWeight: 600, fontSize: 11,
+                letterSpacing: '0.04em', color: 'var(--ink)', lineHeight: 1.65,
+                background: 'rgba(217,74,61,0.06)',
+                border: '1px solid rgba(217,74,61,0.18)',
+                borderRadius: 10, padding: '10px 18px',
+              }}>
+                {gmaxDescription}
+              </div>
+            )}
             <div style={{
               fontFamily: 'var(--haas)', fontSize: 10, letterSpacing: '0.08em',
               color: 'var(--ink-mute)', lineHeight: 1.8,

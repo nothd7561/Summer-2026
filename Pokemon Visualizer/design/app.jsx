@@ -172,15 +172,17 @@ function App() {
 
   return (
     <div style={{ position:'relative', width:'100%', minHeight:'100%' }}>
+      <style>{`
+        @keyframes introFade { 0%,55%{opacity:1} 100%{opacity:0} }
+        @keyframes landingReveal { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+      `}</style>
       {/* Game-building entry: black screen fades out on first load */}
       {!introGone && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
           background: '#000', pointerEvents: 'none',
           animation: 'introFade 1700ms ease-out forwards',
-        }}>
-          <style>{`@keyframes introFade { 0%,55%{opacity:1} 100%{opacity:0} }`}</style>
-        </div>
+        }}/>
       )}
       {tweaks.showBubbles && <BgBubbles count={14} seed={screenNum + 7}/>}
       {tweaks.showChrome && <Chrome screen={screenNum} locale={locale} onLocaleChange={setLocale}
@@ -251,7 +253,7 @@ function App() {
       </div>}
 
       {/* Landing section — always full viewport */}
-      <div style={{ position:'relative', width:'100%', height:'100vh' }}>
+      <div style={{ position:'relative', width:'100%', height:'100vh', animation:'landingReveal 800ms 900ms ease-out both' }}>
         <Landing data={data} onConfirm={confirmPick} locale={locale} landingCmdRef={landingCmdRef} onPhaseChange={setLandingPhase}/>
         {target && <ScrollHint onClick={scrollToStats}/>}
       </div>
