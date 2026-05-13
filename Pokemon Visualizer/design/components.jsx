@@ -44,34 +44,64 @@ const CHROME_T = {
   },
 };
 
-function Chrome({ screen, locale = 'EN', onLocaleChange, showBlurb = false }) {
+function Chrome({ screen, locale = 'EN', onLocaleChange, showBlurb = false, statsActions = null }) {
   const t = CHROME_T[locale] || CHROME_T.EN;
   return (
     <div className="chrome">
       <div className="chrome-inner">
         <div className="chrome-top">
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div className="brand">poké<span className="dot">.</span><span className="sup">°</span></div>
-            {showBlurb && (
-              <div style={{
-                fontFamily:'var(--mono)', fontSize:8, letterSpacing:'0.13em',
-                textTransform:'uppercase', color:'var(--ink-mute)', lineHeight:1.4,
-                transition:'opacity 400ms ease',
-              }}>double click<br/>pokeball · return</div>
+          <div style={{ display:'flex', flexDirection:'column', gap: statsActions ? 10 : 0, alignItems:'flex-start' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div className="brand">poké<span className="dot">.</span><span className="sup">°</span></div>
+              {showBlurb && (
+                <div style={{
+                  fontFamily:'var(--mono)', fontSize:8, letterSpacing:'0.13em',
+                  textTransform:'uppercase', color:'var(--ink-mute)', lineHeight:1.4,
+                  transition:'opacity 400ms ease',
+                }}>double click<br/>pokeball · return</div>
+              )}
+            </div>
+            {statsActions && (
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button className="btn ghost" onClick={statsActions.onBack}
+                    style={{ padding:'5px 12px', fontSize:9, letterSpacing:'0.16em' }}>
+                    ← BACK
+                  </button>
+                  <button className="btn" onClick={statsActions.onRandom}
+                    style={{ padding:'5px 12px', fontSize:9, letterSpacing:'0.16em' }}>
+                    ↻ RANDOM
+                  </button>
+                </div>
+                <div style={{
+                  fontFamily:'var(--mono)', fontSize:8, letterSpacing:'0.14em',
+                  textTransform:'uppercase', color:'var(--ink-mute)', paddingLeft:2,
+                }}>
+                  Hover rings · Evolution stages
+                </div>
+              </div>
             )}
           </div>
-          <div className="locale">
-            {['EN','JP','ZH'].map(l => (
-              <button key={l} className={'pill' + (locale === l ? ' on' : '')}
-                onClick={() => onLocaleChange && onLocaleChange(l)}
-                style={{ all:'unset', cursor:'pointer', width:28, height:28, borderRadius:999,
-                  border:'1px solid var(--ink)', display:'inline-flex', alignItems:'center',
-                  justifyContent:'center', fontWeight:600,
-                  background: locale === l ? 'var(--ink)' : 'transparent',
-                  color: locale === l ? 'var(--paper)' : 'var(--ink)',
-                  transition:'background 160ms, color 160ms',
-                }}>{l}</button>
-            ))}
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:7 }}>
+            <div style={{
+              fontFamily:'var(--haas)', fontWeight:700,
+              fontSize:11, letterSpacing:'-0.01em',
+              color:'var(--ink)', whiteSpace:'nowrap',
+              lineHeight:1,
+            }}>Coded and Designed by Lucas Lu</div>
+            <div className="locale">
+              {['EN','JP','ZH'].map(l => (
+                <button key={l} className={'pill' + (locale === l ? ' on' : '')}
+                  onClick={() => onLocaleChange && onLocaleChange(l)}
+                  style={{ all:'unset', cursor:'pointer', width:28, height:28, borderRadius:999,
+                    border:'1px solid var(--ink)', display:'inline-flex', alignItems:'center',
+                    justifyContent:'center', fontWeight:600,
+                    background: locale === l ? 'var(--ink)' : 'transparent',
+                    color: locale === l ? 'var(--paper)' : 'var(--ink)',
+                    transition:'background 160ms, color 160ms',
+                  }}>{l}</button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="chrome-bottom">

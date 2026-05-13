@@ -34,15 +34,14 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
       const H = container.parentElement?.clientHeight || 580;
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(Math.round(W * 0.22), Math.round(H * 0.22));
-      renderer.setPixelRatio(1);
+      renderer.setSize(W, H);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setClearColor(0x000000, 0);
       if (THREE.SRGBColorSpace !== undefined) renderer.outputColorSpace = THREE.SRGBColorSpace;
       else renderer.outputEncoding = THREE.sRGBEncoding;
-      renderer.domElement.style.display        = 'block';
-      renderer.domElement.style.width          = '100%';
-      renderer.domElement.style.height         = '100%';
-      renderer.domElement.style.imageRendering = 'pixelated';
+      renderer.domElement.style.display = 'block';
+      renderer.domElement.style.width   = '100%';
+      renderer.domElement.style.height  = '100%';
       container.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
@@ -320,7 +319,7 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
         const nH = container.parentElement?.clientHeight || H;
         camera.aspect = nW / nH;
         camera.updateProjectionMatrix();
-        renderer.setSize(Math.round(nW * 0.22), Math.round(nH * 0.22));
+        renderer.setSize(nW, nH);
       };
       window.addEventListener('resize', onResize);
       cleanupResize = () => window.removeEventListener('resize', onResize);
@@ -423,7 +422,7 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
             textTransform:'uppercase', color:'var(--ink)',
             borderBottom:'1.5px solid var(--ink)', paddingBottom:2,
             whiteSpace:'nowrap',
-          }}>Get Started with Pokemon!</span>
+          }}>learn</span>
         </div>
       )}
     </div>

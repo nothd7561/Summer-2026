@@ -4,9 +4,9 @@ const { useState: useStateL, useEffect: useEffectL, useMemo: useMemoL, useRef: u
 const LANDING_T = {
   EN: {
     eyebrow: 'Summer 2026',
-    headline1: 'Learn About',
-    headline2: 'Your',
-    headlineItalic: 'Pokémon.',
+    headline1: 'Get Started',
+    headline2: 'with',
+    headlineItalic: 'Pokemon!',
     desc: 'A project that combines data extraction and graphic design.',
     diveLabel: 'Ready to explore',
     dive: 'Dive In',
@@ -187,10 +187,39 @@ function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange 
   return (
     <div style={{ position:'relative', width:'100%', height:'100%', zIndex:5 }}>
 
-      {/* 3D POKEMON CENTER — hidden during confirm transition and search */}
+      {/* Gradient sky — separate so POKEMON text can sit between it and the canvas */}
       <div style={{
         position:'absolute', inset:0, zIndex:1,
         background:'linear-gradient(180deg,#a8edea,#b3eae9,#bee7e8,#c8e4e7,#d3e2e7,#dedfe6,#e9dce5,#f3d9e4,#fed6e3)',
+        opacity: (viewPhase === 'confirming' || viewPhase === 'searching') ? 0 : 1,
+        transition: 'opacity 500ms ease',
+        pointerEvents: 'none',
+      }}/>
+
+      {/* POKEMON tiled watermark — fills full viewport, clipped by overflow hidden */}
+      <div style={{
+        position:'absolute', inset:0, zIndex:1,
+        overflow:'hidden',
+        userSelect:'none', pointerEvents:'none',
+        opacity: oTypo * 0.065,
+        transition:'opacity 400ms ease',
+      }}>
+        {Array.from({length:20}).map((_,i) => (
+          <div key={i} style={{
+            fontFamily:'var(--haas)', fontWeight:700,
+            fontSize:'clamp(52px, 5.2vw, 94px)',
+            lineHeight:0.9, letterSpacing:'-0.04em',
+            textTransform:'uppercase', color:'var(--ink)',
+            whiteSpace:'nowrap',
+          }}>
+            {'POKEMON '.repeat(10)}
+          </div>
+        ))}
+      </div>
+
+      {/* 3D POKEMON CENTER — later in DOM than POKEMON text, same zIndex:1, so canvas paints on top */}
+      <div style={{
+        position:'absolute', inset:0, zIndex:1,
         opacity: (viewPhase === 'confirming' || viewPhase === 'searching') ? 0 : 1,
         transition: 'opacity 500ms ease',
         pointerEvents: (viewPhase === 'confirming' || viewPhase === 'searching') ? 'none' : 'auto',
@@ -219,12 +248,6 @@ function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange 
         }}>
           {String(featured.number).padStart(4,'0')}
         </div>
-        {/* Vertical column rules */}
-        {['33%','67%'].map((x,i) => (
-          <div key={i} style={{ position:'absolute', top:0, bottom:0, left:x, width:1, background:'var(--ink)', opacity:0.07 }}/>
-        ))}
-        {/* Horizontal mid rule */}
-        <div style={{ position:'absolute', left:0, right:0, top:'50%', height:1, background:'var(--ink)', opacity:0.07 }}/>
         {/* Bottom-left metadata strip */}
         <div style={{
           position:'absolute', bottom:32, left:'clamp(40px,6vw,100px)',
@@ -303,17 +326,13 @@ function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange 
             <span>{t.eyebrow}</span>
           </div>
           <h1 style={{
-            fontFamily:'var(--display)', fontWeight:800,
+            fontFamily:'var(--haas)', fontWeight:700,
             fontSize:'clamp(38px, 3.8vw, 68px)',
-            lineHeight:0.93, letterSpacing:'-0.045em', margin:0,
+            lineHeight:0.93, letterSpacing:'-0.02em', margin:0,
             textTransform:'uppercase',
           }}>
             {t.headline1}<br/>
-            {t.headline2}{' '}
-            <span style={{
-              fontFamily:'var(--serif)', fontWeight:300,
-              fontStyle:'italic', textTransform:'none',
-            }}>{t.headlineItalic}</span>
+            {t.headline2}{' '}{t.headlineItalic}
           </h1>
         </div>
 

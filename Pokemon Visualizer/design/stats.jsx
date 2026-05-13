@@ -4,7 +4,7 @@ const { useState: useStateS, useMemo: useMemoS, useRef: useRefS, useEffect: useE
 const STAT_T = {
   EN: {
     menu: '// MENU', back: '← BACK', random: '↻ RANDOM', dossier: 'DOSSIER',
-    nav: ['Overview', 'Statistics', 'Morphology', 'Environment', 'Abilities'],
+    nav: ['Overview', 'Statistics', 'Morphology', 'Environment', 'Abilities', 'Combat', 'Evolution'],
     stage: (n, t) => `STAGE ${n} OF ${t} · CLICK TO SWITCH`,
     noChain: 'NO EVOLUTIONARY CHAIN',
     legendary: 'LEGENDARY', mythical: 'MYTHICAL',
@@ -17,7 +17,7 @@ const STAT_T = {
   },
   JP: {
     menu: '// メニュー', back: '← 戻る', random: '↻ ランダム', dossier: 'ファイル',
-    nav: ['概要', '統計', '形態', '環境', '技能'],
+    nav: ['概要', '統計', '形態', '環境', '技能', '対戦', '進化'],
     stage: (n, t) => `段階 ${n}/${t} · クリックで切替`,
     noChain: '進化なし',
     legendary: '伝説', mythical: '幻',
@@ -29,7 +29,7 @@ const STAT_T = {
   },
   ZH: {
     menu: '// 菜单', back: '← 返回', random: '↻ 随机', dossier: '档案',
-    nav: ['概览', '统计', '形态', '环境', '技能'],
+    nav: ['概览', '统计', '形态', '环境', '技能', '战斗', '进化'],
     stage: (n, t) => `阶段 ${n}/${t} · 点击切换`,
     noChain: '无进化链',
     legendary: '传说', mythical: '幻之',
@@ -40,6 +40,78 @@ const STAT_T = {
     morphDesc: '外形、体型与视觉分类', envDesc: '栖息地与繁殖', gen: '世代',
   },
 };
+
+// ── Type matchup chart (Gen 6+) — attacker → { defender: multiplier } ──
+const TYPE_CHART = {
+  Normal:   { Rock:0.5, Ghost:0, Steel:0.5 },
+  Fire:     { Fire:0.5, Water:0.5, Grass:2, Ice:2, Bug:2, Rock:0.5, Dragon:0.5, Steel:2 },
+  Water:    { Fire:2, Water:0.5, Grass:0.5, Ground:2, Rock:2, Dragon:0.5 },
+  Grass:    { Fire:0.5, Water:2, Grass:0.5, Poison:0.5, Ground:2, Flying:0.5, Bug:0.5, Rock:2, Dragon:0.5, Steel:0.5 },
+  Electric: { Water:2, Electric:0.5, Grass:0.5, Ground:0, Flying:2, Dragon:0.5 },
+  Ice:      { Water:0.5, Grass:2, Ice:0.5, Ground:2, Flying:2, Dragon:2, Steel:0.5 },
+  Fighting: { Normal:2, Ice:2, Poison:0.5, Flying:0.5, Psychic:0.5, Bug:0.5, Rock:2, Ghost:0, Dark:2, Steel:2, Fairy:0.5 },
+  Poison:   { Grass:2, Poison:0.5, Ground:0.5, Rock:0.5, Ghost:0.5, Steel:0, Fairy:2 },
+  Ground:   { Fire:2, Electric:2, Grass:0.5, Poison:2, Flying:0, Bug:0.5, Rock:2, Steel:2 },
+  Flying:   { Electric:0.5, Grass:2, Fighting:2, Bug:2, Rock:0.5, Steel:0.5 },
+  Psychic:  { Fighting:2, Poison:2, Psychic:0.5, Dark:0, Steel:0.5 },
+  Bug:      { Fire:0.5, Grass:2, Fighting:0.5, Poison:0.5, Flying:0.5, Psychic:2, Ghost:0.5, Dark:2, Steel:0.5, Fairy:0.5 },
+  Rock:     { Fire:2, Ice:2, Fighting:0.5, Ground:0.5, Flying:2, Bug:2, Steel:0.5 },
+  Ghost:    { Normal:0, Psychic:2, Ghost:2, Dark:0.5 },
+  Dragon:   { Dragon:2, Steel:0.5, Fairy:0 },
+  Dark:     { Fighting:0.5, Psychic:2, Ghost:2, Dark:0.5, Fairy:0.5 },
+  Steel:    { Fire:0.5, Water:0.5, Electric:0.5, Ice:2, Rock:2, Steel:0.5, Fairy:2 },
+  Fairy:    { Fire:0.5, Fighting:2, Poison:0.5, Dragon:2, Dark:2, Steel:0.5 },
+};
+const ALL_TYPES = ['Normal','Fire','Water','Grass','Electric','Ice','Fighting','Poison','Ground','Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel','Fairy'];
+
+function getDefenseChart(type1, type2) {
+  return ALL_TYPES.reduce((out, atk) => {
+    const row = TYPE_CHART[atk] || {};
+    out[atk] = (row[type1] ?? 1) * (type2 ? (row[type2] ?? 1) : 1);
+    return out;
+  }, {});
+}
+
+function Combat({ p }) {
+  const chart = getDefenseChart(p.type1, p.type2);
+  const groups = {};
+  for (const [type, mult] of Object.entries(chart)) {
+    if (mult !== 1) { if (!groups[mult]) groups[mult] = []; groups[mult].push(type); }
+  }
+  const rows = [
+    { mult:4,    label:'4×', sub:'quad weakness',   color:'#d94a3d' },
+    { mult:2,    label:'2×', sub:'weak',             color:'#e07c40' },
+    { mult:0.5,  label:'½×', sub:'resistant',        color:'#3d77d9' },
+    { mult:0.25, label:'¼×', sub:'quad resistant',   color:'#2a5aa0' },
+    { mult:0,    label:'0×', sub:'immune',           color:'#8a8a9a' },
+  ].filter(r => groups[r.mult]?.length);
+
+  if (!rows.length) return (
+    <div style={{ fontFamily:'var(--haas)', fontSize:11, color:'var(--ink-mute)', paddingTop:8 }}>
+      All types deal neutral damage to {p.name}.
+    </div>
+  );
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
+      <div style={{ fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
+        Damage taken when attacked by each type
+      </div>
+      {rows.map(({ mult, label, sub, color }) => (
+        <div key={mult} style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
+            <span style={{ fontFamily:'var(--haas)', fontWeight:700, fontSize:18, color, lineHeight:1 }}>{label}</span>
+            <span style={{ fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.16em', textTransform:'uppercase', color:'var(--ink-mute)' }}>{sub}</span>
+          </div>
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+            {groups[mult].map(type => (
+              <span key={type} className={'type-chip t-' + type.toLowerCase()} style={{ fontSize:9, padding:'3px 9px' }}>{type}</span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // rings sized dynamically per sprite — see dynBASE_R / dynRING_GAP in Stats
 
@@ -118,12 +190,13 @@ function MegaRing({ r }) {
   );
 }
 
-function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN' }) {
+function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, onEvo, locale = 'EN' }) {
   const [tab, setTab] = useStateS('overview');
   const [hoveredRing, setHoveredRing] = useStateS(null);
   const t = STAT_T[locale] || STAT_T.EN;
   const mainline = window.PokeData.mainlineChain(chain, pokemon);
-  const NAV = t.nav.map((label, i) => ({ id: ['overview','statistics','morphology','environment','abilities'][i], label }));
+  const BASE_IDS = ['overview','statistics','morphology','environment','abilities','combat'];
+  const NAV = t.nav.slice(0, 6).map((label, i) => ({ id: BASE_IDS[i], label }));
   const hovP = hoveredRing !== null ? mainline[hoveredRing] : null;
 
   // dynamic ring sizing — measure the actual rendered sprite container
@@ -149,9 +222,26 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
 
   // Mega evolution
   const isFinalEvo = !mainline.length || pokemon.number === mainline[mainline.length - 1].number;
-  const megaForms = isFinalEvo
-    ? (window.__pokeAllFull || []).filter(p => p.isForm && p.chainId === pokemon.chainId && p.name.toLowerCase().includes('mega'))
-    : [];
+  const megaForms = (() => {
+    if (!isFinalEvo) return [];
+    const pokeLower = pokemon.name.toLowerCase();
+    const raw = (window.__pokeAllFull || []).filter(
+      p => p.isForm
+        && p.chainId === pokemon.chainId
+        && p.name.toLowerCase().includes('mega')
+        && p.name.toLowerCase().startsWith(pokeLower + '-')
+    );
+    // Attach GIF sprites from MEGA_GIF_MAP, then deduplicate by effective sprite
+    const gifMap = window.MEGA_GIF_MAP || {};
+    const withGif = raw.map(p => ({ ...p, gifSprite: gifMap[p.name] || null }));
+    const seen = new Set();
+    return withGif.filter(p => {
+      const key = p.gifSprite || p.sprite;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
   const hasMega = megaForms.length > 0;
 
   // Alt forms — same-root name variants (excludes mega, gmax, totem, cap, cosplay, starter)
@@ -208,7 +298,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
     };
   }, [hasMega, spriteR, pokemon.number]);
 
-  function triggerMega(form) {
+  function triggerMega(forms) {
     const rect = spriteRef.current?.getBoundingClientRect();
     const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
     const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
@@ -219,8 +309,8 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
       setMegaAnimPhase('landed');
       setTimeout(() => {
         setMegaAnimPhase('flash');
-        onMega(form);                           // scroll under the white screen
-        setTimeout(() => setMegaAnimPhase(null), 1200);
+        onMega(forms);                          // pass full forms array to MegaView
+        setTimeout(() => setMegaAnimPhase(null), 1900);
       }, 1500);
     }, 700);
   }
@@ -256,7 +346,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
         <div style={{
           position:'absolute', left:'50%', bottom:'-0.12em',
           transform:'translateX(-50%)',
-          fontFamily:'var(--display)', fontWeight:900,
+          fontFamily:'var(--haas)', fontWeight:900,
           fontSize:'min(22vw, 220px)', letterSpacing:'-0.05em',
           textTransform:'uppercase', color:'var(--ink)',
           opacity:0.04, userSelect:'none', lineHeight:1, whiteSpace:'nowrap',
@@ -271,32 +361,11 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
         }}/>
       </div>
 
-      {/* LEFT NAV — buttons then sidenav, both flowing from top */}
+      {/* LEFT NAV — sidenav only, centered vertically */}
       <div style={{
-        display:'flex', flexDirection:'column', gap:28,
-        padding:'clamp(70px, 9vh, 100px) 0 clamp(50px, 6vh, 75px) clamp(24px, 3.5vw, 70px)',
+        display:'flex', flexDirection:'column', justifyContent:'center',
+        padding:'clamp(90px, 12vh, 140px) 0 clamp(110px, 15vh, 170px) clamp(24px, 3.5vw, 70px)',
       }}>
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          <div style={{ display:'flex', gap:6 }}>
-            <button className="btn ghost" onClick={onBack}
-              style={{ padding:'7px 14px', fontSize:10, letterSpacing:'0.16em' }}>
-              {t.back}
-            </button>
-            <button className="btn" onClick={() => {
-              const pool = window.__pokeAll || [];
-              const r = pool[Math.floor(Math.random() * pool.length)];
-              if (r && onPick) onPick(r);
-            }} style={{ padding:'7px 14px', fontSize:10, letterSpacing:'0.16em' }}>
-              {t.random}
-            </button>
-          </div>
-          <div style={{
-            fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.16em',
-            textTransform:'uppercase', color:'var(--ink-mute)', paddingLeft:2,
-          }}>
-            Hover rings for evolution stages
-          </div>
-        </div>
         <div className="sidenav">
           {NAV.map(item => (
             <button key={item.id}
@@ -305,6 +374,11 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
               {item.label}
             </button>
           ))}
+          {!hasMega && (
+            <button onClick={() => onEvo?.()}>
+              {t.nav[6] || 'Evolution'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -326,7 +400,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
           onClick={() => { if (hovP && hovP.number !== pokemon.number) onPick && onPick(hovP); }}>
 
           <EvolutionRings rings={Math.max(1, mainline.length)} active={pokemon} chain={mainline}
-            hoveredRing={hoveredRing} baseR={dynBASE_R} ringGap={dynRING_GAP}/>
+            hoveredRing={hoveredRing} baseR={dynBASE_R} ringGap={dynRING_GAP} hasMega={hasMega}/>
 
           {hasMega && <MegaRing r={dynMegaR}/>}
 
@@ -380,13 +454,13 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
             }}>
             <img src={hovP.sprite} alt={hovP.name} style={{ width:44, height:44, objectFit:'contain', imageRendering:'pixelated' }}/>
             <div>
-              <div style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:13 }}>{hovP.name}</div>
-              <div style={{ fontFamily:'var(--mono)', fontSize:9, color:'var(--ink-mute)', letterSpacing:'0.14em', marginTop:2 }}>#{String(hovP.number).padStart(4,'0')}</div>
+              <div style={{ fontFamily:'var(--haas)', fontWeight:700, fontSize:13 }}>{hovP.name}</div>
+              <div style={{ fontFamily:'var(--haas)', fontSize:9, color:'var(--ink-mute)', letterSpacing:'0.14em', marginTop:2 }}>#{String(hovP.number).padStart(4,'0')}</div>
             </div>
             <span className={'type-chip t-' + hovP.type1.toLowerCase()} style={{ fontSize:9, padding:'3px 8px' }}>{hovP.type1}</span>
             {hovP.type2 && <span className={'type-chip t-' + hovP.type2.toLowerCase()} style={{ fontSize:9, padding:'3px 8px' }}>{hovP.type2}</span>}
             {hovP.number !== pokemon.number && (
-              <span style={{ fontFamily:'var(--mono)', fontSize:9, color:'var(--hot)', letterSpacing:'0.14em' }}>→ SWITCH</span>
+              <span style={{ fontFamily:'var(--haas)', fontSize:9, color:'var(--hot)', letterSpacing:'0.14em' }}>→ SWITCH</span>
             )}
           </div>
         )}
@@ -394,11 +468,11 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
 
       {/* RIGHT — name + dossier panel */}
       <div style={{
-        padding:'clamp(70px, 9vh, 100px) clamp(24px, 3.5vw, 70px) clamp(50px, 6vh, 75px) 12px',
-        display:'flex', flexDirection:'column', gap:14, minWidth:0, overflow:'hidden',
+        padding:'clamp(90px, 12vh, 140px) clamp(24px, 3.5vw, 70px) clamp(40px, 5vh, 70px) 12px',
+        display:'flex', flexDirection:'column', gap:14, justifyContent:'center', minWidth:0, overflow:'hidden',
       }}>
         <div style={{
-          fontFamily:'var(--display)', fontWeight:600,
+          fontFamily:'var(--haas)', fontWeight:600,
           fontSize:12, letterSpacing:'0.32em', textTransform:'uppercase',
           color:'var(--ink-mute)',
         }}>
@@ -407,7 +481,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
 
         <div>
           <h1 style={{
-            fontFamily:'var(--display)', fontWeight:900,
+            fontFamily:'var(--haas)', fontWeight:900,
             fontSize:`clamp(30px, ${Math.max(26, 100 - pokemon.name.length * 6)}px, 88px)`,
             lineHeight:0.88, letterSpacing:'-0.05em',
             color:'var(--hot)', margin:0, wordBreak:'break-word',
@@ -417,12 +491,12 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
             {pokemon.name}
           </h1>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, flexWrap:'wrap' }}>
-            <div style={{ fontFamily:'var(--mono)', fontSize:11, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
+            <div style={{ fontFamily:'var(--haas)', fontSize:11, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
               {t.gen} {pokemon.generation.replace('gen-','').toUpperCase()}
             </div>
             <button onClick={() => setShiny(s => !s)} style={{
               all:'unset', cursor:'pointer',
-              fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
+              fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
               display:'inline-flex', alignItems:'center', gap:5,
               padding:'4px 10px', borderRadius:999,
               border:`1px solid ${shiny ? '#c79a2a' : 'rgba(17,17,17,0.25)'}`,
@@ -438,7 +512,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
               return (
                 <button key={form.number} onClick={() => switchForm(form)} style={{
                   all:'unset', cursor:'pointer',
-                  fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
+                  fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase',
                   display:'inline-flex', alignItems:'center', gap:5,
                   padding:'4px 10px', borderRadius:999,
                   border:`1px solid ${isActive ? 'var(--hot)' : 'rgba(17,17,17,0.25)'}`,
@@ -464,14 +538,14 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
 
         <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0 }}>
           <div style={{ marginBottom:16, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:16, letterSpacing:'0.18em', textTransform:'uppercase' }}>
+            <span style={{ fontFamily:'var(--haas)', fontWeight:700, fontSize:16, letterSpacing:'0.18em', textTransform:'uppercase' }}>
               → {NAV.find(n=>n.id===tab)?.label}
             </span>
             <div style={{ display:'flex', gap:14 }}>
               {NAV.findIndex(n => n.id === tab) > 0 && (
                 <button onClick={() => setTab(NAV[NAV.findIndex(n => n.id === tab) - 1].id)} style={{
                   all:'unset', cursor:'pointer',
-                  fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
+                  fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
                   color:'var(--ink-mute)', borderBottom:'1px dashed var(--ink-mute)', paddingBottom:1,
                   transition:'color 160ms, border-color 160ms',
                 }}
@@ -483,7 +557,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
               {NAV.findIndex(n => n.id === tab) < NAV.length - 1 && (
                 <button onClick={() => setTab(NAV[NAV.findIndex(n => n.id === tab) + 1].id)} style={{
                   all:'unset', cursor:'pointer',
-                  fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
+                  fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
                   color:'var(--ink-mute)', borderBottom:'1px dashed var(--ink-mute)', paddingBottom:1,
                   transition:'color 160ms, border-color 160ms',
                 }}
@@ -492,14 +566,25 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
                   next →
                 </button>
               )}
+              {NAV.findIndex(n => n.id === tab) === NAV.length - 1 && !hasMega && onEvo && (
+                <button onClick={() => onEvo()} style={{
+                  all:'unset', cursor:'pointer',
+                  fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
+                  color:'var(--hot)', borderBottom:'1px dashed var(--hot)', paddingBottom:1,
+                  transition:'color 160ms, border-color 160ms',
+                }}>
+                  evolution →
+                </button>
+              )}
             </div>
           </div>
-          <div style={{ flex:1, overflowY:'auto', paddingRight:6 }} className="no-scrollbar">
+          <div style={{ flex:1, overflowY:'auto', paddingRight:6 }}>
             <div style={{ display: tab === 'overview'     ? undefined : 'none' }}><Overview p={pokemon} t={t}/></div>
             <div style={{ display: tab === 'statistics'   ? undefined : 'none' }}><Statistics p={pokemon} t={t}/></div>
             <div style={{ display: tab === 'morphology'   ? undefined : 'none' }}><Morphology p={pokemon} t={t}/></div>
             <div style={{ display: tab === 'environment'  ? undefined : 'none' }}><Environment p={pokemon} t={t}/></div>
             <div style={{ display: tab === 'abilities'    ? undefined : 'none' }}><Abilities p={pokemon} t={t}/></div>
+            <div style={{ display: tab === 'combat'       ? undefined : 'none' }}><Combat p={pokemon}/></div>
           </div>
         </div>
       </div>
@@ -507,7 +592,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
       {/* Portal: mega stone button at fixed position — never clipped by overflow:hidden */}
       {hasMega && megaStoneFixed && megaAnimPhase === null && ReactDOM.createPortal(
         <div
-          onClick={() => triggerMega(megaForms[0])}
+          onClick={() => triggerMega(megaForms)}
           title="Mega Evolve"
           style={{
             position:'fixed', left: megaStoneFixed.x, top: megaStoneFixed.y,
@@ -568,11 +653,11 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, locale = 'EN
       {/* Phase 3 — flash: single div animated so opacity:0 at unmount, no abrupt snap */}
       {megaAnimPhase === 'flash' && ReactDOM.createPortal(
         <>
-          <style>{`@keyframes mFlashFade{0%,22%{opacity:1}100%{opacity:0}}`}</style>
+          <style>{`@keyframes mFlashFade{0%,38%{opacity:1}100%{opacity:0}}`}</style>
           <div style={{
             position:'fixed', inset:0, zIndex:280,
             background:'white', pointerEvents:'none',
-            animation:'mFlashFade 1200ms ease-out forwards',
+            animation:'mFlashFade 1900ms ease-in-out forwards',
           }}/>
         </>,
         document.body
@@ -610,8 +695,8 @@ function Statistics({ p, t }) {
       {stats.map(([name, val, norm]) => (
         <div key={name}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: 7 }}>
-            <span style={{ fontFamily:'var(--display)', fontWeight:600, fontSize:11, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--ink-mute)' }}>{name}</span>
-            <span style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:14 }}>
+            <span style={{ fontFamily:'var(--haas)', fontWeight:600, fontSize:11, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--ink-mute)' }}>{name}</span>
+            <span style={{ fontFamily:'var(--haas)', fontWeight:700, fontSize:14 }}>
               {val}<span style={{color:'var(--ink-mute)', fontWeight:400, fontSize:10}}> /255</span>
             </span>
           </div>
@@ -621,7 +706,7 @@ function Statistics({ p, t }) {
         </div>
       ))}
       <div className="dot-rule" style={{ marginTop: 4 }}/>
-      <div style={{ display:'flex', justifyContent:'space-between', fontFamily:'var(--mono)', fontSize:11, letterSpacing:'0.18em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', fontFamily:'var(--haas)', fontSize:11, letterSpacing:'0.18em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
         <span>{t.bstTotal}</span>
         <span style={{color:'var(--ink)'}}><b>{p.bst}</b> / 720</span>
       </div>
@@ -689,7 +774,7 @@ function Abilities({ p, t }) {
       <div className="mono-meta" style={dashed ? { color:'var(--hot)' } : {}}>
         {dashed ? t.hiddenAbility : t.ability}
       </div>
-      <div style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:18, letterSpacing:'-0.01em', marginTop:4, lineHeight:1.1 }}>
+      <div style={{ fontFamily:'var(--haas)', fontWeight:700, fontSize:18, letterSpacing:'-0.01em', marginTop:4, lineHeight:1.1 }}>
         {window.PokeData.titleCase(name)}
       </div>
       {descs[name] ? (
@@ -697,7 +782,7 @@ function Abilities({ p, t }) {
           {descs[name]}
         </p>
       ) : descs[name] === undefined ? (
-        <p style={{ margin:'6px 0 0', fontSize:10, color:'var(--ink-mute)', opacity:0.5, fontFamily:'var(--mono)', letterSpacing:'0.1em' }}>loading…</p>
+        <p style={{ margin:'6px 0 0', fontSize:10, color:'var(--ink-mute)', opacity:0.5, fontFamily:'var(--haas)', letterSpacing:'0.1em' }}>loading…</p>
       ) : null}
     </div>
   );
@@ -714,7 +799,7 @@ function Cell({ label, value }) {
   return (
     <div>
       <div className="mono-meta">{label}</div>
-      <div style={{ fontFamily:'var(--display)', fontWeight:700, fontSize:20, marginTop:5 }}>{value || '—'}</div>
+      <div style={{ fontFamily:'var(--haas)', fontWeight:700, fontSize:20, marginTop:5 }}>{value || '—'}</div>
     </div>
   );
 }
@@ -725,14 +810,14 @@ function Swatch({ color }) {
   return (
     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
       <div style={{ width:48, height:48, background: hex, borderRadius: 12, border:'1px solid var(--line)', flexShrink:0 }}/>
-      <div style={{ fontFamily:'var(--mono)', fontSize:11, letterSpacing:'0.18em', textTransform:'uppercase' }}>
+      <div style={{ fontFamily:'var(--haas)', fontSize:11, letterSpacing:'0.18em', textTransform:'uppercase' }}>
         {color} · {hex}
       </div>
     </div>
   );
 }
 
-function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
+function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap, hasMega }) {
   const prevNumRef   = useRefS(null);
   const [tracingIdx, setTracingIdx] = useStateS(null);
   const traceCircRef = useRefS(null);
@@ -741,14 +826,16 @@ function EvolutionRings({ rings, active, chain, hoveredRing, baseR, ringGap }) {
   useEffectS(() => {
     const outerIdx = rings - 1;
     const activeIdx = chain.findIndex(p => p && p.number === active.number);
-    if (activeIdx === outerIdx && prevNumRef.current !== null && prevNumRef.current !== active.number) {
+    if (hasMega && activeIdx === outerIdx && chain.length > 1 && prevNumRef.current !== null && prevNumRef.current !== active.number) {
       setTracingIdx(outerIdx);
       const t = setTimeout(() => setTracingIdx(null), 1500);
       prevNumRef.current = active.number;
       return () => clearTimeout(t);
     }
+    // Navigated away from outer ring — clear any in-flight trace immediately
+    setTracingIdx(null);
     prevNumRef.current = active.number;
-  }, [active.number, rings]);
+  }, [active.number, rings, hasMega]);
 
   // Kick off the stroke-dashoffset draw on next frame
   useEffectS(() => {

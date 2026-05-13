@@ -29,12 +29,15 @@ function App() {
   const [landingPhase, setLandingPhase] = useStateApp('idle');
   const [pokeballLifted, setPokeballLifted] = useStateApp(false);
   const [megaTarget, setMegaTarget] = useStateApp(null);
+  const [evoShown, setEvoShown] = useStateApp(false);
+  const [pokeballHovered, setPokeballHovered] = useStateApp(false);
   const [tweaks, setTweak] = window.useTweaks
     ? window.useTweaks(TWEAK_DEFAULTS)
     : [TWEAK_DEFAULTS, () => {}];
 
   const statsRef     = useRefApp(null);
   const megaRef      = useRefApp(null);
+  const evoRef       = useRefApp(null);
   const landingCmdRef = useRefApp(null);
 
   useEffectApp(() => {
@@ -80,12 +83,26 @@ function App() {
     document.documentElement.style.setProperty('--hot', ACCENTS[tweaks.accent] || ACCENTS.ember);
   }, [tweaks.palette, tweaks.accent]);
 
-  function activateMega(megaForm) {
-    setMegaTarget(megaForm);
+  function activateMega(megaForms) {
+    setMegaTarget(megaForms);  // now an array
     requestAnimationFrame(() => {
       const root = document.getElementById('root');
       if (root && megaRef.current) root.scrollTop = megaRef.current.offsetTop;
     });
+  }
+
+  function activateEvo() {
+    setEvoShown(true);
+    requestAnimationFrame(() => {
+      const root = document.getElementById('root');
+      if (root && evoRef.current) root.scrollTop = evoRef.current.offsetTop;
+    });
+  }
+
+  function backFromEvo() {
+    const root = document.getElementById('root');
+    if (root && statsRef.current) root.scrollTo({ top: statsRef.current.offsetTop, behavior: 'smooth' });
+    setTimeout(() => setEvoShown(false), 600);
   }
 
   function backFromMega() {
@@ -97,6 +114,7 @@ function App() {
   function confirmPick(p) {
     setTarget(p);
     setMegaTarget(null);
+    setEvoShown(false);
     setTransitionDone(false);
     setPokeballLifted(true);
     // Instant-jump to stats while flash covers the screen
@@ -117,6 +135,7 @@ function App() {
     if (root) root.scrollTo({ top: 0, behavior: 'smooth' });
     setPokeballLifted(false);
     setMegaTarget(null);
+    setEvoShown(false);
     landingCmdRef.current?.goIdle();
     setTimeout(() => { setTarget(null); setTransitionDone(false); }, 650);
   }
@@ -125,6 +144,7 @@ function App() {
     if (root) root.scrollTo({ top: 0, behavior: 'smooth' });
     setPokeballLifted(false);
     setMegaTarget(null);
+    setEvoShown(false);
     setTimeout(() => {
       landingCmdRef.current?.goSearch();
       setTimeout(() => { setTarget(null); setTransitionDone(false); }, 400);
@@ -146,31 +166,42 @@ function App() {
   return (
     <div style={{ position:'relative', width:'100%', minHeight:'100%' }}>
       {tweaks.showBubbles && <BgBubbles count={14} seed={screenNum + 7}/>}
-      {tweaks.showChrome && <Chrome screen={screenNum} locale={locale} onLocaleChange={setLocale} showBlurb={landingPhase === 'searching' && !megaTarget}/>}
+      {tweaks.showChrome && <Chrome screen={screenNum} locale={locale} onLocaleChange={setLocale}
+        showBlurb={landingPhase === 'searching' && !megaTarget && !target}
+        statsActions={target && transitionDone && !evoShown && !megaTarget ? {
+          onBack: backToSearch,
+          onRandom: () => {
+            const pool = (data && data.all.filter(p => !p.isForm)) || [];
+            const r = pool[Math.floor(Math.random() * pool.length)];
+            if (r) confirmPick(r);
+          },
+        } : null}
+      />}
 
-      {/* Pokeball — hidden in pokecenter (no target), visible once a pokemon is selected */}
-      {target && <div style={{
+      {/* Pokeball — hidden in pokecenter idle, visible during search + stats */}
+      {(landingPhase === 'searching' || target) && <div style={{
         position:'fixed',
         top: pokeballLifted ? '22px' : (landingPhase === 'searching' ? 'clamp(108px,13vh,138px)' : 'clamp(82px,11vh,115px)'),
         left:'50%', transform:'translateX(-50%)',
         zIndex: 60,
         transition: 'top 400ms cubic-bezier(.2,.7,.2,1)',
+        display:'flex', flexDirection:'column', alignItems:'center', gap:8,
       }}>
         <button
           onClick={() => { if (pokeballLifted) { backToSearch(); } else { document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }); } }}
           onDoubleClick={reset}
-          title="Click to scroll up · Double-click to return to Pokémon Centre"
+          onMouseEnter={() => setPokeballHovered(true)}
+          onMouseLeave={() => setPokeballHovered(false)}
           style={{
             all:'unset', cursor:'pointer',
             width: 40, height: 40, borderRadius:'50%',
             display:'flex', alignItems:'center', justifyContent:'center',
             background:'var(--paper)',
             border:'1px solid rgba(17,17,17,0.14)',
-            boxShadow:'0 4px 18px rgba(0,0,0,0.13)',
+            boxShadow: pokeballHovered ? '0 6px 22px rgba(0,0,0,0.18)' : '0 4px 18px rgba(0,0,0,0.13)',
+            transform: pokeballHovered ? 'scale(1.1)' : 'scale(1)',
             transition:'transform 160ms ease, box-shadow 160ms ease',
           }}
-          onMouseEnter={e => { e.currentTarget.style.transform='scale(1.1)'; e.currentTarget.style.boxShadow='0 6px 22px rgba(0,0,0,0.18)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.boxShadow='0 4px 18px rgba(0,0,0,0.13)'; }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24">
             <path d="M3 12 A9 9 0 0 1 21 12 Z" fill="var(--hot)"/>
@@ -180,6 +211,26 @@ function App() {
             <circle cx="12" cy="12" r="2.8" fill="white" stroke="var(--ink)" strokeWidth="1.5"/>
           </svg>
         </button>
+        {/* Hover tooltip — fades in below pokeball */}
+        <div style={{
+          opacity: pokeballHovered ? 1 : 0,
+          transition: 'opacity 220ms ease',
+          pointerEvents: 'none',
+          display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+          background:'var(--paper)',
+          border:'1px solid rgba(17,17,17,0.10)',
+          borderRadius:10,
+          padding:'6px 12px',
+          boxShadow:'0 4px 14px rgba(0,0,0,0.09)',
+          whiteSpace:'nowrap',
+        }}>
+          <div style={{ fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
+            <span style={{ color:'var(--hot)', fontWeight:700 }}>1×</span> Return to Top
+          </div>
+          <div style={{ fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase', color:'var(--ink-mute)' }}>
+            <span style={{ color:'var(--hot)', fontWeight:700 }}>2×</span> Return to Centre
+          </div>
+        </div>
       </div>}
 
       {/* Landing section — always full viewport */}
@@ -199,8 +250,9 @@ function App() {
                   pokemon={target}
                   chain={chain}
                   onBack={backToSearch}
-                  onPick={(p) => { setTarget(p); setMegaTarget(null); setTransitionDone(true); }}
+                  onPick={(p) => { setTarget(p); setMegaTarget(null); setEvoShown(false); setTransitionDone(true); }}
                   onMega={activateMega}
+                  onEvo={activateEvo}
                   locale={locale}
                 />
               </div>
@@ -208,11 +260,23 @@ function App() {
         </div>
       )}
 
+      {/* Evo section — below stats, for non-mega pokemon; minHeight so Gmax can extend below */}
+      {target && evoShown && (
+        <div ref={evoRef} style={{ position:'relative', width:'100%', minHeight:'100vh' }}>
+          <window.EvoView
+            pokemon={target}
+            chain={chain}
+            onBack={backFromEvo}
+            onPick={(p) => { setTarget(p); setEvoShown(false); setTransitionDone(true); }}
+          />
+        </div>
+      )}
+
       {/* Mega section — below stats, appears after mega evolution triggered */}
       {target && megaTarget && (
         <div ref={megaRef} style={{ position:'relative', width:'100%', height:'100vh' }}>
           <window.MegaView
-            megaPokemon={megaTarget}
+            megaForms={megaTarget}
             basePokemon={target}
             onBack={backFromMega}
           />

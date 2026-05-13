@@ -1,0 +1,38 @@
+// mega-sprites.js — maps CSV mega form names to local animated GIF sprites
+(function () {
+  var BASE = '../mega sprites/';
+  window.MEGA_GIF_MAP = {
+    'Absol-Mega-Z':            BASE + 'mega_absol_z_gen_5_pokemon_sprite_by_retronc_dl2hjf4.gif',
+    'Barbaracle-Mega':         BASE + 'mega_barbaracle_gen_5_pokemon_sprite_by_retronc_dkrpspn.gif',
+    'Baxcalibur-Mega':         BASE + 'mega_baxcalibur_gen_5_pokemon_sprite_by_retronc_dkvam3n.gif',
+    'Chandelure-Mega':         BASE + 'mega_chandelure_gen_5_pokemon_sprite_by_retronc_dkt1ezr.gif',
+    'Chesnaught-Mega':         BASE + 'mega_chesnaught_gen_5_pokemon_sprite_by_retronc_dkixija.gif',
+    'Chimecho-Mega':           BASE + 'mega_chimecho_gen_5_pokemon_sprite_by_retronc_dkuwr1q.gif',
+    'Clefable-Mega':           BASE + 'mega_clefable_gen_5_pokemon_sprite_by_retronc_dkriq38.gif',
+    'Delphox-Mega':            BASE + 'mega_delphox_gen_5_pokemon_sprite_by_retronc_dkiz77i.gif',
+    'Emboar-Mega':             BASE + 'mega_emboar_gen_5_pokemon_sprite_by_retronc_dkse2zs.gif',
+    'Falinks-Mega':            BASE + 'mega_falinks_gen_5_pokemon_sprite_by_retronc_dksthdu.gif',
+    'Feraligatr-Mega':         BASE + 'mega_feraligatr_gen_5_pokemon_sprite_by_retronc_dkskl3u.gif',
+    'Floette-Mega':            BASE + 'mega_floette_gen_5_pokemon_sprite_by_retronc_dkrv55z.gif',
+    'Froslass-Mega':           BASE + 'mega_froslass_gen_5_pokemon_sprite_by_retronc_dksug5r.gif',
+    'Golurk-Mega':             BASE + 'mega_golurk_gen_5_pokemon_sprite_by_retronc_dl4siv7.gif',
+    'Greninja-Mega':           BASE + 'mega_greninja_gen_5_pokemon_sprite_by_retronc_dkj3uf3.gif',
+    'Hawlucha-Mega':           BASE + 'mega_hawlucha_gen_5_pokemon_sprite_by_retronc_dkfezvl.gif',
+    'Lucario-Mega-Z':          BASE + 'mega_lucario_z_gen_5_pokemon_sprite_by_retronc_dl0n0bo.gif',
+    'Malamar-Mega':            BASE + 'mega_malamar_gen_5_pokemon_sprite_by_retronc_dkid14d.gif',
+    'Meganium-Mega':           BASE + 'mega_meganium_gen_5_pokemon_sprite_by_retronc_dkscnv3.gif',
+    'Meowstic-Mega':           BASE + 'mega_meowstic_gen_5_pokemon_sprite_by_retronc_dl2oerl.gif',
+    'Pyroar-Mega':             BASE + 'mega_pyroar_gen_5_pokemon_sprite_by_retronc_dks6a8z.gif',
+    'Raichu-Mega-X':           BASE + 'mega_raichu_x_gen_5_pokemon_sprite_by_retronc_dkjer29.gif',
+    'Raichu-Mega-Y':           BASE + 'mega_raichu_y_gen_5_pokemon_sprite_by_retronc_dkk6pm0.gif',
+    'Scolipede-Mega':          BASE + 'mega_scolipede_gen_5_pokemon_sprite_by_retronc_dkqt9b4.gif',
+    'Scovillain-Mega':         BASE + 'mega_scovillain_gen_5_pokemon_sprite_by_retronc_dl2sd2n.gif',
+    'Skarmory-Mega':           BASE + 'mega_skarmory_gen_5_pokemon_sprite_by_retronc_dkr3s8z.gif',
+    'Staraptor-Mega':          BASE + 'mega_staraptor_gen_5_pokemon_sprite_by_retronc_dl4jx55.gif',
+    'Starmie-Mega':            BASE + 'mega_starmie_gen_5_pokemon_sprite_by_retronc_dkr2dgd.gif',
+    'Tatsugiri-Curly-Mega':    BASE + 'mega_tatsugiri_gen_5_pokemon_sprite_by_retronc_dl5wbmk.gif',
+    'Tatsugiri-Droopy-Mega':   BASE + 'mega_tatsugiri_gen_5_pokemon_sprite_by_retronc_dl5wbmk.gif',
+    'Tatsugiri-Stretchy-Mega': BASE + 'mega_tatsugiri_gen_5_pokemon_sprite_by_retronc_dl5wbmk.gif',
+    'Zeraora-Mega':            BASE + 'mega_zeraora_gen_5_pokemon_sprite_by_retronc_dkxznvc.gif',
+  };
+})();
