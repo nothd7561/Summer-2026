@@ -1,9 +1,7 @@
 <div align="center">
 Summer 2026
 Stuff I built over the summer — trying to get better at data science and actually have something to show for it by the time recruiting season hits.
-Show Image
-Show Image
-Show Image
+
 </div>
 <br>
 
