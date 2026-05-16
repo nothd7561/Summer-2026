@@ -243,6 +243,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, onEvo, local
     });
   })();
   const hasMega = megaForms.length > 0;
+  const hasGmax = !!(window.__pokeAllFull || []).find(p => p.name.toLowerCase() === pokemon.name.toLowerCase() + '-gmax');
 
   // Alt forms — same-root name variants (excludes mega, gmax, totem, cap, cosplay, starter)
   const SKIP_FORM = ['mega','gmax','totem','cap','cosplay','starter','partner'];
@@ -374,7 +375,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, onEvo, local
               {item.label}
             </button>
           ))}
-          {!hasMega && (
+          {(!hasMega || hasGmax) && (
             <button onClick={() => onEvo?.()}>
               {t.nav[6] || 'Evolution'}
             </button>
@@ -566,7 +567,7 @@ function Stats({ pokemon, chain, onBack, onPick, onMega = () => {}, onEvo, local
                   next →
                 </button>
               )}
-              {NAV.findIndex(n => n.id === tab) === NAV.length - 1 && !hasMega && onEvo && (
+              {NAV.findIndex(n => n.id === tab) === NAV.length - 1 && (!hasMega || hasGmax) && onEvo && (
                 <button onClick={() => onEvo()} style={{
                   all:'unset', cursor:'pointer',
                   fontFamily:'var(--haas)', fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',

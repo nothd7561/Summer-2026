@@ -527,7 +527,9 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
                         {i > 0 && (
                           <div style={{
                             position: 'relative', display: 'flex', alignItems: 'center',
-                            padding: '0 10px', flexShrink: 0,
+                            paddingLeft: '10px',
+                            paddingRight: i === evoFamily.length - 1 ? '72px' : '10px',
+                            flexShrink: 0,
                           }}>
                             {/* Card floats above the arrow */}
                             <div style={{
@@ -590,9 +592,7 @@ function EvoView({ pokemon, chain, onBack, onPick }) {
                           <img src={p.sprite} alt={p.name} style={{
                             width: 'min(155px, 12vw)', height: 'min(155px, 12vw)',
                             objectFit: 'contain', imageRendering: 'pixelated',
-                            filter: isActive
-                              ? 'drop-shadow(0 6px 18px rgba(217,74,61,0.5))'
-                              : 'drop-shadow(0 4px 10px rgba(0,0,0,0.12))',
+                            filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.12))',
                             transition: 'filter 220ms ease',
                           }}/>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>

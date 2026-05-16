@@ -55,15 +55,16 @@ const LANDING_T = {
 //  'diveIn'    — zoom done, right panel shows "Dive In?" confirmation
 //  'searching' — search panel visible on right
 
-function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange }) {
+function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange, onCompare }) {
   const t = LANDING_T[locale] || LANDING_T.EN;
   const [query, setQuery]         = useStateL('');
   const [selected, setSelected]   = useStateL(null);
   const [hover, setHover]         = useStateL(0);
   const [picked, setPicked]       = useStateL(false);
   const [viewPhase, setViewPhase] = useStateL('idle');
-  const [flashing, setFlashing]   = useStateL(false);
-  const [slowFlash, setSlowFlash] = useStateL(false);
+  const [flashing, setFlashing]       = useStateL(false);
+  const [slowFlash, setSlowFlash]     = useStateL(false);
+  const [showCompareConfirm, setShowCompareConfirm] = useStateL(false);
   const pendingTargetRef = useRefL(null);
   const inputRef         = useRefL(null);
   const pokeCenterCmdRef = useRefL(null);
@@ -135,6 +136,33 @@ function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange 
   function handleBackToStart() {
     pokeCenterCmdRef.current?.resetToStart();
     setViewPhase('idle');
+  }
+
+  function handleComputerAnnotationClick() {
+    pokeCenterCmdRef.current?.startComputerZoom();
+  }
+
+  function handleComputerZoomComplete() {
+    setShowCompareConfirm(true);
+  }
+
+  function handleConfirmCompare() {
+    setShowCompareConfirm(false);
+    setSlowFlash(true);
+    setFlashing(true);
+    setTimeout(() => {
+      onCompare?.();
+      pokeCenterCmdRef.current?.snapToStart();
+      setTimeout(() => {
+        setSlowFlash(false);
+        setFlashing(false);
+      }, 480);
+    }, 400);
+  }
+
+  function handleCancelCompare() {
+    setShowCompareConfirm(false);
+    pokeCenterCmdRef.current?.resetToStart();
   }
   function handleDiveIn() {
     setViewPhase('confirming');
@@ -228,6 +256,8 @@ function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange 
           cmdRef={pokeCenterCmdRef}
           onZoomStart={() => setViewPhase('zooming')}
           onZoomComplete={() => setViewPhase('diveIn')}
+          onComputerAnnotationClick={handleComputerAnnotationClick}
+          onComputerZoomComplete={handleComputerZoomComplete}
         />
       </div>
 
@@ -530,6 +560,44 @@ function Landing({ data, onConfirm, locale = 'EN', landingCmdRef, onPhaseChange 
           ))}
         </div>,
         document.body
+      )}
+
+      {/* COMPARE CONFIRM DIALOG */}
+      <style>{`@keyframes confIn { from{opacity:0;transform:scale(0.88) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }`}</style>
+      {showCompareConfirm && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:200,
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.18)' }} onClick={handleCancelCompare}/>
+          <div style={{
+            position:'relative', zIndex:1,
+            background:'var(--paper)',
+            border:'1px solid rgba(17,17,17,0.1)',
+            borderRadius:24,
+            padding:'36px 44px',
+            textAlign:'center',
+            boxShadow:'0 16px 56px rgba(0,0,0,0.2)',
+            animation:'confIn 260ms cubic-bezier(.2,.8,.2,1) both',
+          }}>
+            <div style={{
+              fontFamily:'var(--mono)', fontSize:9, letterSpacing:'0.24em',
+              textTransform:'uppercase', color:'var(--ink-mute)', marginBottom:12,
+            }}>pokémon centre</div>
+            <div style={{
+              fontFamily:'var(--display)', fontWeight:800, fontSize:30,
+              letterSpacing:'-0.03em', marginBottom:8,
+            }}>Wanna Compare?</div>
+            <div style={{
+              fontFamily:'var(--mono)', fontSize:10, letterSpacing:'0.14em',
+              textTransform:'uppercase', color:'var(--ink-mute)', marginBottom:28,
+            }}>side-by-side stat comparison</div>
+            <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+              <button className="btn" onClick={handleConfirmCompare}>Yes <span>→</span></button>
+              <button className="btn ghost" onClick={handleCancelCompare}>No thanks</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* FLASH OVERLAY — slow build on dive-in, fast fade on reveal */}

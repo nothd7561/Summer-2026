@@ -216,7 +216,7 @@ function MegaView({ megaForms, basePokemon, onBack }) {
         transform: 'translateY(-50%)',
         zIndex: 4,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-        animation: revealed ? 'megaSlideUp 800ms 900ms ease-out both' : 'none',
+        animation: 'megaSlideUp 800ms 900ms ease-out both',
       }}>
         <div style={{
           fontFamily: 'var(--haas)', fontSize: 8, letterSpacing: '0.26em',

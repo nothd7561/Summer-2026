@@ -1,21 +1,31 @@
 // pokecenter.jsx — Pokemon Center full-mesh view, horizontal-only movement
 const { useEffect: useEffectPC, useRef: useRefPC, useState: useStatePC } = React;
 
-const GLB_PATH = '../pokemon_center.glb';
+const GLB_PATH = '../self-work/pokemon_center.glb';
 
-function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
+function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete, onComputerZoomStart, onComputerZoomComplete, onComputerAnnotationClick }) {
   const [ready, setReady] = useStatePC(false);
-  const mountRef         = useRefPC(null);
-  const svgLearnRef      = useRefPC(null);
-  const svgGlowRef       = useRefPC(null);
-  const svgArrowRef      = useRefPC(null);
-  const svgRingRef       = useRefPC(null);
-  const learnRef         = useRefPC(null);
-  const controlsRef      = useRefPC(null);
-  const zoomActiveRef    = useRefPC(false);
-  const zoomDoneFiredRef = useRefPC(false);
-  const hoverRef         = useRefPC(false);
-  const lineProg         = useRefPC(0);
+  const mountRef          = useRefPC(null);
+  // pokeball / learn annotation
+  const svgLearnRef       = useRefPC(null);
+  const svgGlowRef        = useRefPC(null);
+  const svgArrowRef       = useRefPC(null);
+  const svgRingRef        = useRefPC(null);
+  const learnRef          = useRefPC(null);
+  // computer / compare annotation
+  const svgCompLearnRef   = useRefPC(null);
+  const svgCompArrowRef   = useRefPC(null);
+  const compLearnRef      = useRefPC(null);
+
+  const controlsRef       = useRefPC(null);
+  const zoomActiveRef     = useRefPC(false);
+  const zoomDoneFiredRef  = useRefPC(false);
+  const hoverRef          = useRefPC(false);
+  const lineProg          = useRefPC(0);
+  const compZoomActiveRef    = useRefPC(false);
+  const compZoomDoneFiredRef = useRefPC(false);
+  const compHoverRef         = useRefPC(false);
+  const compLineProg         = useRefPC(0);
   const ballZoomActiveRef = useRefPC(false);
   const ballZoomCbRef     = useRefPC(null);
 
@@ -52,6 +62,8 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
       const ZOOMLOOK     = new THREE.Vector3();
       const BALLZOOMPOS  = new THREE.Vector3();
       const BALLZOOMLOOK = new THREE.Vector3();
+      const COMPZOOMPOS  = new THREE.Vector3();
+      const COMPZOOMLOOK = new THREE.Vector3();
 
       const camera = new THREE.PerspectiveCamera(60, W / H, 0.01, 500);
 
@@ -72,11 +84,16 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
       const resetFromLook  = new THREE.Vector3();
       const zoomFromPos    = new THREE.Vector3();
       const zoomFromLook   = new THREE.Vector3();
+      const compFromPos    = new THREE.Vector3();
+      const compFromLook   = new THREE.Vector3();
       let resetT      = 0;
       let resetActive = false;
       let zoomT       = 0;
+      let compZoomT   = 0;
       const pokeballPos = new THREE.Vector3();
       const meshTopPos  = new THREE.Vector3();
+      const computerPos = new THREE.Vector3();
+      const compTopPos  = new THREE.Vector3();
 
       const loader = new THREE.GLTFLoader();
       const clock  = new THREE.Clock();
@@ -112,6 +129,13 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
           BALLZOOMPOS.set(sz.x * 0.20, b.min.y + sz.y * 0.60, b.min.z * 0.52 + 1.1);
           BALLZOOMLOOK.copy(pokeballPos);
 
+          // Computer / compare annotation — left side of the center desk
+          computerPos.set(-sz.x * 0.20, b.min.y + sz.y * 0.56, b.min.z * 0.48);
+          compTopPos.set(-sz.x * 0.20, b.max.y * 0.66, b.min.z * 0.48);
+          // Pure dolly right: positive X shifts toward right side of scene, same look direction
+          COMPZOOMPOS.set(sz.x * 0.09, midY, camZ * 0.58);
+          COMPZOOMLOOK.set(sz.x * 0.09, midY, 0);
+
           camera.position.copy(STARTPOS);
           camera.lookAt(STARTLOOK);
           controls.target.copy(STARTLOOK);
@@ -124,9 +148,18 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
                 resetFromPos.copy(camera.position);
                 resetFromLook.copy(currentLook);
                 resetT = 0;
+                zoomT = 0;
+                compZoomT = 0;
                 zoomActiveRef.current = false;
                 zoomDoneFiredRef.current = false;
                 ballZoomActiveRef.current = false;
+                ballZoomCbRef.current = null;
+                compZoomActiveRef.current = false;
+                compZoomDoneFiredRef.current = false;
+                hoverRef.current = false;
+                lineProg.current = 0;
+                compHoverRef.current = false;
+                compLineProg.current = 0;
                 resetActive = true;
               },
               zoomToCenter(cb) {
@@ -134,6 +167,15 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
                 ballZoomActiveRef.current = true;
                 hoverRef.current = false;
                 lineProg.current = 0;
+              },
+              startComputerZoom() {
+                compFromPos.copy(camera.position);
+                compFromLook.copy(currentLook);
+                compZoomT = 0;
+                resetActive = false;
+                resetT = 0;
+                compZoomActiveRef.current = true;
+                onComputerZoomStart?.();
               },
               snapToStart() {
                 camera.position.copy(STARTPOS);
@@ -144,11 +186,15 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
                 resetActive = false;
                 resetT = 0;
                 zoomActiveRef.current = false;
-                zoomDoneFiredRef.current = true;  // keep non-interactive in search mode
+                zoomDoneFiredRef.current = true;
                 ballZoomActiveRef.current = false;
                 ballZoomCbRef.current = null;
                 hoverRef.current = false;
                 lineProg.current = 0;
+                compZoomActiveRef.current = false;
+                compZoomDoneFiredRef.current = true;
+                compHoverRef.current = false;
+                compLineProg.current = 0;
               },
             };
           }
@@ -176,7 +222,7 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
             }
           }, undefined, (err) => console.warn('[Toxtricity idle]', err));
 
-          loader.load('../ditto_dancing_pokemon.glb', (dGltf) => {
+          loader.load('../self-work/ditto_dancing_pokemon.glb', (dGltf) => {
             if (cancelled) return;
             const ditto = dGltf.scene;
             const dBox  = new THREE.Box3().setFromObject(ditto);
@@ -203,66 +249,105 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
       function updateAnnotations() {
         const cW = container.parentElement?.clientWidth  || W;
         const cH = container.parentElement?.clientHeight || H;
+
+        // ── Pokeball / Learn ──
         const learnEl   = learnRef.current;
         const learnLine = svgLearnRef.current;
-        if (!learnEl || !learnLine) return;
+        if (learnEl && learnLine) {
+          const p  = pokeballPos.clone().project(camera);
+          const bx = ((p.x + 1) / 2) * cW;
+          const by = ((-p.y + 1) / 2) * cH;
+          const sx = bx - 7;
 
-        const p  = pokeballPos.clone().project(camera);
-        const bx = ((p.x + 1) / 2) * cW;
-        const by = ((-p.y + 1) / 2) * cH;
-        const sx = bx - 7;
+          const pt     = meshTopPos.clone().project(camera);
+          const topY   = ((-pt.y + 1) / 2) * cH;
+          const labelY = topY - 16;
 
-        const pt     = meshTopPos.clone().project(camera);
-        const topY   = ((-pt.y + 1) / 2) * cH;
-        const labelY = topY - 16;
+          const prog = Math.max(0, Math.min(1, lineProg.current));
+          const bob  = Math.sin(Date.now() * 0.0018) * 3;
 
-        const prog = Math.max(0, Math.min(1, lineProg.current));
-        const bob  = Math.sin(Date.now() * 0.0018) * 3;
+          const isZooming = zoomActiveRef.current || zoomDoneFiredRef.current || resetActive;
+          const arrowEl = svgArrowRef.current;
+          if (arrowEl) {
+            const aw = 5;
+            const tipY  = by - 42 + bob;
+            const baseY = by - 56 + bob;
+            arrowEl.setAttribute('points', `${sx-aw},${baseY} ${sx+aw},${baseY} ${sx},${tipY}`);
+            arrowEl.setAttribute('opacity', isZooming ? 0 : Math.max(0, (1 - prog * 2) * 0.75));
+          }
 
-        // Arrow: permanently above pokeball, points down, bobs gently, fades out as line appears
-        const isZooming = zoomActiveRef.current || zoomDoneFiredRef.current || resetActive;
-        const arrowEl = svgArrowRef.current;
-        if (arrowEl) {
-          const aw = 5;
-          const tipY  = by - 42 + bob;
-          const baseY = by - 56 + bob;
-          arrowEl.setAttribute('points', `${sx-aw},${baseY} ${sx+aw},${baseY} ${sx},${tipY}`);
-          const baseOpacity = isZooming ? 0 : Math.max(0, (1 - prog * 2) * 0.75);
-          arrowEl.setAttribute('opacity', baseOpacity);
+          const lineBottom = by - 30;
+          const lineTop    = labelY + 22;
+          const lineY1     = lineBottom + (lineTop - lineBottom) * prog;
+          learnLine.setAttribute('x1', sx);
+          learnLine.setAttribute('y1', lineY1);
+          learnLine.setAttribute('x2', sx);
+          learnLine.setAttribute('y2', lineBottom);
+          learnLine.setAttribute('opacity', prog * 0.7);
+
+          const glowEl = svgGlowRef.current;
+          if (glowEl) {
+            glowEl.setAttribute('cx', bx - 5);
+            glowEl.setAttribute('cy', by);
+            glowEl.setAttribute('r', 70);
+            glowEl.style.opacity = String(prog * 0.42);
+          }
+
+          const ringEl = svgRingRef.current;
+          if (ringEl) {
+            ringEl.setAttribute('cx', bx - 5);
+            ringEl.setAttribute('cy', by);
+            ringEl.setAttribute('r', String(30 + prog * 14));
+            ringEl.setAttribute('opacity', String(prog * 0.9));
+          }
+
+          learnEl.style.left      = sx + 'px';
+          learnEl.style.top       = labelY + 'px';
+          learnEl.style.transform = 'translateX(-50%)';
+          learnEl.style.opacity   = String(prog);
         }
 
-        // Line: grows upward from just above pokeball to label on hover (separate from arrow)
-        const lineBottom = by - 30;
-        const lineTop    = labelY + 22;
-        const lineY1     = lineBottom + (lineTop - lineBottom) * prog;
-        learnLine.setAttribute('x1', sx);
-        learnLine.setAttribute('y1', lineY1);
-        learnLine.setAttribute('x2', sx);
-        learnLine.setAttribute('y2', lineBottom);
-        learnLine.setAttribute('opacity', prog * 0.7);
+        // ── Computer / Compare ──
+        const compEl   = compLearnRef.current;
+        const compLine = svgCompLearnRef.current;
+        if (compEl && compLine) {
+          const CDXP = 375, CDYP = -20; // annotation offset: 375px right, 20px up
+          const cp   = computerPos.clone().project(camera);
+          const cbx  = ((cp.x + 1) / 2) * cW + CDXP;
+          const cby  = ((-cp.y + 1) / 2) * cH + CDYP;
+          const csx  = cbx - 7;
 
-        // Glow bloom
-        const glowEl = svgGlowRef.current;
-        if (glowEl) {
-          glowEl.setAttribute('cx', bx - 5);
-          glowEl.setAttribute('cy', by);
-          glowEl.setAttribute('r', 70);
-          glowEl.style.opacity = String(prog * 0.42);
+          const ct      = compTopPos.clone().project(camera);
+          const ctopY   = ((-ct.y + 1) / 2) * cH + CDYP;
+          const clabelY = ctopY - 16;
+
+          const cprog = Math.max(0, Math.min(1, compLineProg.current));
+          const cbob  = Math.sin(Date.now() * 0.0018 + 1.5) * 3;
+
+          const isCompZooming = compZoomActiveRef.current || compZoomDoneFiredRef.current || resetActive;
+          const compArrowEl = svgCompArrowRef.current;
+          if (compArrowEl) {
+            const aw = 5;
+            const tipY  = cby - 42 + cbob;
+            const baseY = cby - 56 + cbob;
+            compArrowEl.setAttribute('points', `${csx-aw},${baseY} ${csx+aw},${baseY} ${csx},${tipY}`);
+            compArrowEl.setAttribute('opacity', isCompZooming ? 0 : Math.max(0, (1 - cprog * 2) * 0.75));
+          }
+
+          const clineBottom = cby - 30;
+          const clineTop    = clabelY + 22;
+          const clineY1     = clineBottom + (clineTop - clineBottom) * cprog;
+          compLine.setAttribute('x1', csx);
+          compLine.setAttribute('y1', clineY1);
+          compLine.setAttribute('x2', csx);
+          compLine.setAttribute('y2', clineBottom);
+          compLine.setAttribute('opacity', cprog * 0.7);
+
+          compEl.style.left      = csx + 'px';
+          compEl.style.top       = clabelY + 'px';
+          compEl.style.transform = 'translateX(-50%)';
+          compEl.style.opacity   = String(cprog);
         }
-
-        // Stroke ring — expands and brightens on hover
-        const ringEl = svgRingRef.current;
-        if (ringEl) {
-          ringEl.setAttribute('cx', bx - 5);
-          ringEl.setAttribute('cy', by);
-          ringEl.setAttribute('r', String(30 + prog * 14));
-          ringEl.setAttribute('opacity', String(prog * 0.9));
-        }
-
-        learnEl.style.left      = sx + 'px';
-        learnEl.style.top       = labelY + 'px';
-        learnEl.style.transform = 'translateX(-50%)';
-        learnEl.style.opacity   = String(prog);
       }
 
       const animate = () => {
@@ -271,7 +356,7 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
 
         if (zoomActiveRef.current && !zoomDoneFiredRef.current) {
           zoomT = Math.min(zoomT + 0.022, 1);
-          const ez = zoomT * zoomT * (3 - 2 * zoomT); // smoothstep
+          const ez = zoomT * zoomT * (3 - 2 * zoomT);
           camera.position.lerpVectors(zoomFromPos, ZOOMPOS, ez);
           currentLook.lerpVectors(zoomFromLook, ZOOMLOOK, ez);
           camera.lookAt(currentLook);
@@ -279,6 +364,17 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
             zoomActiveRef.current = false;
             zoomDoneFiredRef.current = true;
             onZoomComplete?.();
+          }
+        } else if (compZoomActiveRef.current && !compZoomDoneFiredRef.current) {
+          compZoomT = Math.min(compZoomT + 0.022, 1);
+          const ez = compZoomT * compZoomT * (3 - 2 * compZoomT);
+          camera.position.lerpVectors(compFromPos, COMPZOOMPOS, ez);
+          currentLook.lerpVectors(compFromLook, COMPZOOMLOOK, ez);
+          camera.lookAt(currentLook);
+          if (compZoomT >= 1) {
+            compZoomActiveRef.current = false;
+            compZoomDoneFiredRef.current = true;
+            onComputerZoomComplete?.();
           }
         } else if (resetActive) {
           resetT = Math.min(resetT + 0.012, 1);
@@ -307,8 +403,12 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
           }
         }
 
-        const hT = (hoverRef.current && !zoomActiveRef.current && !zoomDoneFiredRef.current && !ballZoomActiveRef.current) ? 1 : 0;
-        lineProg.current += (hT - lineProg.current) * 0.09;
+        const anyZoom = zoomActiveRef.current || zoomDoneFiredRef.current || ballZoomActiveRef.current
+                     || compZoomActiveRef.current || compZoomDoneFiredRef.current;
+        const hT  = (hoverRef.current  && !anyZoom) ? 1 : 0;
+        const chT = (compHoverRef.current && !anyZoom) ? 1 : 0;
+        lineProg.current     += (hT  - lineProg.current)     * 0.09;
+        compLineProg.current += (chT - compLineProg.current) * 0.09;
 
         const delta = clock.getDelta();
         idleMixer?.update(delta);
@@ -333,29 +433,42 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
         const cW = container.parentElement?.clientWidth  || W;
         const cH = container.parentElement?.clientHeight || H;
         const p  = pokeballPos.clone().project(camera);
-        return {
-          bx: ((p.x + 1) / 2) * cW,
-          by: ((-p.y + 1) / 2) * cH,
-        };
+        return { bx: ((p.x + 1) / 2) * cW, by: ((-p.y + 1) / 2) * cH };
+      }
+
+      function computerScreenPos() {
+        const cW = container.parentElement?.clientWidth  || W;
+        const cH = container.parentElement?.clientHeight || H;
+        const p  = computerPos.clone().project(camera);
+        return { bx: ((p.x + 1) / 2) * cW, by: ((-p.y + 1) / 2) * cH };
       }
 
       const onMouseMove = (e) => {
-        if (zoomActiveRef.current || zoomDoneFiredRef.current) {
+        const anyZoom = zoomActiveRef.current || zoomDoneFiredRef.current
+                     || compZoomActiveRef.current || compZoomDoneFiredRef.current;
+        if (anyZoom) {
           hoverRef.current = false;
+          compHoverRef.current = false;
           renderer.domElement.style.cursor = 'default';
           return;
         }
         const rect = renderer.domElement.getBoundingClientRect();
-        const { bx, by } = pokeballScreenPos();
-        const hit = Math.hypot(e.clientX - rect.left - bx, e.clientY - rect.top - by) < 60;
-        hoverRef.current = hit;
-        renderer.domElement.style.cursor = hit ? 'pointer' : 'default';
+        const { bx, by }   = pokeballScreenPos();
+        const { bx: cx, by: cy } = computerScreenPos();
+        const hitBall = Math.hypot(e.clientX - rect.left - bx, e.clientY - rect.top - by) < 60;
+        const hitComp = Math.hypot(e.clientX - rect.left - (cx + 375), e.clientY - rect.top - (cy - 20)) < 60;
+        hoverRef.current     = hitBall && !hitComp;
+        compHoverRef.current = hitComp;
+        renderer.domElement.style.cursor = (hitBall || hitComp) ? 'pointer' : 'default';
       };
 
       const onCanvasClick = (e) => {
-        if (zoomActiveRef.current || zoomDoneFiredRef.current) return;
+        const anyZoom = zoomActiveRef.current || zoomDoneFiredRef.current
+                     || compZoomActiveRef.current || compZoomDoneFiredRef.current;
+        if (anyZoom) return;
         const rect = renderer.domElement.getBoundingClientRect();
-        const { bx, by } = pokeballScreenPos();
+        const { bx, by }   = pokeballScreenPos();
+        const { bx: cx, by: cy } = computerScreenPos();
         if (Math.hypot(e.clientX - rect.left - bx, e.clientY - rect.top - by) < 60) {
           zoomFromPos.copy(camera.position);
           zoomFromLook.copy(currentLook);
@@ -364,6 +477,8 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
           resetT = 0;
           zoomActiveRef.current = true;
           onZoomStart?.();
+        } else if (Math.hypot(e.clientX - rect.left - (cx + 375), e.clientY - rect.top - (cy - 20)) < 60) {
+          onComputerAnnotationClick?.();
         }
       };
 
@@ -373,7 +488,6 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
         renderer.domElement.removeEventListener('mousemove', onMouseMove);
         renderer.domElement.removeEventListener('click', onCanvasClick);
       };
-
     }
 
     const poll = setInterval(() => {
@@ -415,6 +529,7 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
             <stop offset="100%" stopColor="var(--hot)" stopOpacity="0"/>
           </radialGradient>
         </defs>
+        {/* Pokeball annotation */}
         <circle ref={svgGlowRef} cx="0" cy="0" r="70"
           fill="url(#pokeball-glow)" style={{opacity:0}}/>
         <circle ref={svgRingRef} cx="0" cy="0" r="22"
@@ -423,17 +538,32 @@ function PokeCenterScene({ cmdRef, onZoomStart, onZoomComplete }) {
           stroke="var(--ink)" strokeWidth="1.2" opacity="0"/>
         <polygon ref={svgArrowRef} points="0,0 0,0 0,0"
           fill="var(--ink)" opacity="0.75"/>
+        {/* Computer annotation */}
+        <line ref={svgCompLearnRef} x1="0" y1="0" x2="0" y2="0"
+          stroke="var(--ink)" strokeWidth="1.2" opacity="0"/>
+        <polygon ref={svgCompArrowRef} points="0,0 0,0 0,0"
+          fill="var(--ink)" opacity="0.75"/>
       </svg>
 
       {ready && (
-        <div ref={learnRef} style={{ position:'absolute', top:0, left:0, zIndex:3, pointerEvents:'none', opacity:0 }}>
-          <span style={{
-            fontFamily:'var(--mono)', fontSize:9, fontWeight:700, letterSpacing:'0.16em',
-            textTransform:'uppercase', color:'var(--ink)',
-            borderBottom:'1.5px solid var(--ink)', paddingBottom:2,
-            whiteSpace:'nowrap',
-          }}>learn</span>
-        </div>
+        <>
+          <div ref={learnRef} style={{ position:'absolute', top:0, left:0, zIndex:3, pointerEvents:'none', opacity:0 }}>
+            <span style={{
+              fontFamily:'var(--mono)', fontSize:9, fontWeight:700, letterSpacing:'0.16em',
+              textTransform:'uppercase', color:'var(--ink)',
+              borderBottom:'1.5px solid var(--ink)', paddingBottom:2,
+              whiteSpace:'nowrap',
+            }}>learn</span>
+          </div>
+          <div ref={compLearnRef} style={{ position:'absolute', top:0, left:0, zIndex:3, pointerEvents:'none', opacity:0 }}>
+            <span style={{
+              fontFamily:'var(--mono)', fontSize:9, fontWeight:700, letterSpacing:'0.16em',
+              textTransform:'uppercase', color:'var(--ink)',
+              borderBottom:'1.5px solid var(--ink)', paddingBottom:2,
+              whiteSpace:'nowrap',
+            }}>compare</span>
+          </div>
+        </>
       )}
     </div>
   );

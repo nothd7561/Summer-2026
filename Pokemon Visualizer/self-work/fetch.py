@@ -1,6 +1,6 @@
 import pandas as pd
 
-input_csv = r'C:\Users\lucas\Downloads\Code\Summer 2026\Pokemon Visualizer\pokemon_complete.csv'
+input_csv = r'C:\Users\lucas\Downloads\Code\Summer 2026\Pokemon Visualizer\pokemon_normalized.csv'
 df = pd.read_csv(input_csv)
 
 #if pokemon doesnt have 2nd type, fill with None string so filter doesnt break
@@ -34,12 +34,7 @@ for index, row in df.iterrows():
 df["is_legendary"] = df["is_legendary"].map({"TRUE": True, "FALSE": False})
 df["is_mythical"] = df["is_mythical"].map({"TRUE": True, "FALSE": False})
 
-df.to_csv(r'C:\Users\lucas\Downloads\Code\Side Projects\poke-api display\pokemon_revised.csv')
+df.to_csv(r'C:\Users\lucas\Downloads\Code\Summer 2026\Pokemon Visualizer\pokemon_full.csv')
 
 
-need_sprite = []
-for index, row in df.iterrows():
-    if pd.isna(row['sprite_url']):
-        need_sprite.append(row["name"])
 
-print (need_sprite)

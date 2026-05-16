@@ -32,15 +32,17 @@ function App() {
   const [evoShown, setEvoShown] = useStateApp(false);
   const [pokeballHovered, setPokeballHovered] = useStateApp(false);
   const [introGone, setIntroGone] = useStateApp(false);
+  const [compareShown, setCompareShown] = useStateApp(false);
 
   const [tweaks, setTweak] = window.useTweaks
     ? window.useTweaks(TWEAK_DEFAULTS)
     : [TWEAK_DEFAULTS, () => {}];
 
-  const statsRef     = useRefApp(null);
-  const megaRef      = useRefApp(null);
-  const evoRef       = useRefApp(null);
-  const landingCmdRef = useRefApp(null);
+  const statsRef          = useRefApp(null);
+  const megaRef           = useRefApp(null);
+  const evoRef            = useRefApp(null);
+  const landingCmdRef     = useRefApp(null);
+  const backSearchTimer   = useRefApp(null);
 
   useEffectApp(() => {
     const t = setTimeout(() => setIntroGone(true), 1700);
@@ -138,6 +140,7 @@ function App() {
   }
 
   function reset() {
+    if (backSearchTimer.current) { clearTimeout(backSearchTimer.current); backSearchTimer.current = null; }
     const root = document.getElementById('root');
     if (root) root.scrollTo({ top: 0, behavior: 'smooth' });
     setPokeballLifted(false);
@@ -147,12 +150,14 @@ function App() {
     setTimeout(() => { setTarget(null); setTransitionDone(false); }, 650);
   }
   function backToSearch() {
+    if (backSearchTimer.current) clearTimeout(backSearchTimer.current);
     const root = document.getElementById('root');
     if (root) root.scrollTo({ top: 0, behavior: 'smooth' });
     setPokeballLifted(false);
     setMegaTarget(null);
     setEvoShown(false);
-    setTimeout(() => {
+    backSearchTimer.current = setTimeout(() => {
+      backSearchTimer.current = null;
       landingCmdRef.current?.goSearch();
       setTimeout(() => { setTarget(null); setTransitionDone(false); }, 400);
     }, 500);
@@ -254,7 +259,8 @@ function App() {
 
       {/* Landing section — always full viewport */}
       <div style={{ position:'relative', width:'100%', height:'100vh', animation:'landingReveal 800ms 900ms ease-out both' }}>
-        <Landing data={data} onConfirm={confirmPick} locale={locale} landingCmdRef={landingCmdRef} onPhaseChange={setLandingPhase}/>
+        <Landing data={data} onConfirm={confirmPick} locale={locale} landingCmdRef={landingCmdRef} onPhaseChange={setLandingPhase}
+          onCompare={() => setCompareShown(true)}/>
         {target && <ScrollHint onClick={scrollToStats}/>}
       </div>
 
@@ -300,6 +306,14 @@ function App() {
             onBack={backFromMega}
           />
         </div>
+      )}
+
+      {/* Compare overlay */}
+      {compareShown && window.CompareView && (
+        <window.CompareView onBack={() => {
+          setCompareShown(false);
+          landingCmdRef.current?.goIdle();
+        }}/>
       )}
 
       {/* Tweaks panel */}
